@@ -1,7 +1,31 @@
 
+import { useEffect, useState } from 'react';
 import './App.css';
 
 function App() {
+  const [roadmap, setRoadmap] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
+
+  useEffect(() => {
+    fetch('/api/roadmap')
+      .then((response) => {
+        if (!response.ok) {
+          throw new Error('Failed to load roadmap');
+        }
+        return response.json();
+      })
+      .then((data) => {
+        setRoadmap(data);
+      })
+      .catch(() => {
+        setError('Unable to load roadmap. Please try again.');
+      })
+      .finally(() => {
+        setLoading(false);
+      });
+  }, []);
+
   return (
     <div className="app">
       <header className="header">
@@ -22,23 +46,19 @@ function App() {
         </section>
 
         <section className="modules" id="roadmap">
-          <article className="module-card">
-            <h3>Java</h3>
-            <p>Build your programming fundamentals.</p>
-            <span>Start with the basics</span>
-          </article>
+          <h2>Your Placement Roadmap</h2>
 
-          <article className="module-card">
-            <h3>DSA</h3>
-            <p>Learn algorithms and solve coding problems.</p>
-            <span>Practice consistently</span>
-          </article>
+          {loading && <p>Loading your roadmap...</p>}
 
-          <article className="module-card">
-            <h3>Aptitude</h3>
-            <p>Improve quantitative and logical reasoning.</p>
-            <span>Strengthen your skills</span>
-          </article>
+          {error && <p role="alert">{error}</p>}
+
+          {!loading && !error && roadmap.map((item) => (
+            <article className="module-card" key={item.id}>
+              <h3>{item.title}</h3>
+              <p>{item.description}</p>
+              <span>{item.status}</span>
+            </article>
+          ))}
         </section>
       </main>
     </div>
