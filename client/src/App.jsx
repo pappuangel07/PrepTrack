@@ -9,30 +9,58 @@ function App() {
   const [success, setSuccess] = useState('');
   const [updatingId, setUpdatingId] = useState(null);
 
-  // Load roadmap from the backend when the page opens
+  const [tasks, setTasks] = useState([]);
+  const [tasksLoading, setTasksLoading] = useState(true);
+  const [taskError, setTaskError] = useState('');
+  const [taskMessage, setTaskMessage] = useState('');
+  const [savingTask, setSavingTask] = useState(false);
+  const [updatingTaskId, setUpdatingTaskId] = useState(null);
+  const [deletingTaskId, setDeletingTaskId] = useState(null);
+
+  const [title, setTitle] = useState('');
+  const [description, setDescription] = useState('');
+  const [dueDate, setDueDate] = useState('');
+
+  // Load roadmap and tasks from the backend
   useEffect(() => {
     async function loadRoadmap() {
       try {
         const response = await fetch('/api/roadmap');
 
         if (!response.ok) {
-          throw new Error(`Failed to load roadmap (HTTP ${response.status})`);
+          throw new Error('Unable to load roadmap.');
         }
 
-        const data = await response.json();
-        setRoadmap(data);
-        setError('');
+        setRoadmap(await response.json());
       } catch (err) {
-        setError(err.message || 'Unable to load roadmap. Please try again.');
+        setError(err.message || 'Unable to load roadmap.');
       } finally {
         setLoading(false);
       }
     }
 
+    async function loadTasks() {
+      try {
+        const response = await fetch('/api/tasks');
+
+        if (!response.ok) {
+          throw new Error('Unable to load tasks.');
+        }
+
+        setTasks(await response.json());
+        setTaskError('');
+      } catch (err) {
+        setTaskError(err.message || 'Unable to load tasks.');
+      } finally {
+        setTasksLoading(false);
+      }
+    }
+
     loadRoadmap();
+    loadTasks();
   }, []);
 
-  // Update one roadmap item's status
+  // Update roadmap progress
   async function updateStatus(id, newStatus) {
     setUpdatingId(id);
     setError('');
@@ -44,56 +72,145 @@ function App() {
         headers: {
           'Content-Type': 'application/json'
         },
-        body: JSON.stringify({
-          status: newStatus
-        })
+        body: JSON.stringify({ status: newStatus })
       });
 
-      // Read the response safely before parsing JSON
-      const responseText = await response.text();
-
-      let data;
-
-      try {
-        data = JSON.parse(responseText);
-      } catch {
-        throw new Error(
-          `Server returned an unexpected response (HTTP ${response.status}). Please try again.`
-        );
-      }
+      const data = await response.json();
 
       if (!response.ok) {
-        throw new Error(data.message || 'Failed to update progress');
+        throw new Error(data.message || 'Failed to update progress.');
       }
 
-      if (!data.item || typeof data.item.id !== 'number') {
-        throw new Error('The server response was missing the updated roadmap item.');
-      }
-
-      // Update React state only after the backend confirms success
-      setRoadmap((currentRoadmap) =>
-        currentRoadmap.map((item) =>
-          item.id === id ? data.item : item
-        )
+      setRoadmap((current) =>
+        current.map((item) => item.id === id ? data.item : item)
       );
 
       setSuccess(`${data.item.title} progress saved successfully!`);
     } catch (err) {
-      setError(err.message || 'Unable to update progress. Please try again.');
+      setError(err.message || 'Unable to update progress.');
     } finally {
       setUpdatingId(null);
     }
   }
 
-  // Calculate completed modules and overall progress
+  // Create a new task
+  async function createTask(event) {
+    event.preventDefault();
+    setTaskError('');
+    setTaskMessage('');
+
+    if (!title.trim()) {
+      setTaskError('Please enter a task title.');
+      return;
+    }
+
+    setSavingTask(true);
+
+    try {
+      const response = await fetch('/api/tasks', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          title: title.trim(),
+          description: description.trim(),
+          due_date: dueDate || null
+        })
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.message || 'Unable to create task.');
+      }
+
+      setTasks((current) => [data.task, ...current]);
+      setTitle('');
+      setDescription('');
+      setDueDate('');
+      setTaskMessage('Task created successfully!');
+    } catch (err) {
+      setTaskError(err.message || 'Unable to create task.');
+    } finally {
+      setSavingTask(false);
+    }
+  }
+
+  // Mark a task complete or incomplete
+  async function toggleTask(task) {
+    setUpdatingTaskId(task.id);
+    setTaskError('');
+    setTaskMessage('');
+
+    try {
+      const response = await fetch(`/api/tasks/${task.id}`, {
+        method: 'PATCH',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({ completed: !Boolean(task.completed) })
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.message || 'Unable to update task.');
+      }
+
+      setTasks((current) =>
+        current.map((item) => item.id === task.id ? data.task : item)
+      );
+
+      setTaskMessage('Task progress saved!');
+    } catch (err) {
+      setTaskError(err.message || 'Unable to update task.');
+    } finally {
+      setUpdatingTaskId(null);
+    }
+  }
+
+  // Delete a task
+  async function deleteTask(id) {
+    const confirmed = window.confirm('Are you sure you want to delete this task?');
+
+    if (!confirmed) return;
+
+    setDeletingTaskId(id);
+    setTaskError('');
+    setTaskMessage('');
+
+    try {
+      const response = await fetch(`/api/tasks/${id}`, {
+        method: 'DELETE'
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.message || 'Unable to delete task.');
+      }
+
+      setTasks((current) => current.filter((task) => task.id !== id));
+      setTaskMessage('Task deleted successfully!');
+    } catch (err) {
+      setTaskError(err.message || 'Unable to delete task.');
+    } finally {
+      setDeletingTaskId(null);
+    }
+  }
+
   const completedCount = roadmap.filter(
     (item) => item.status === 'Completed'
   ).length;
 
-  const progressPercentage =
-    roadmap.length === 0
-      ? 0
-      : Math.round((completedCount / roadmap.length) * 100);
+  const progressPercentage = roadmap.length === 0
+    ? 0
+    : Math.round((completedCount / roadmap.length) * 100);
+
+  const completedTasks = tasks.filter(
+    (task) => Boolean(task.completed)
+  ).length;
 
   return (
     <div className="app">
@@ -110,9 +227,14 @@ function App() {
             and track your placement progress.
           </p>
 
-          <a className="primary-button" href="#roadmap">
-            Explore your roadmap
-          </a>
+          <div className="welcome-actions">
+            <a className="primary-button" href="#roadmap">
+              Explore your roadmap
+            </a>
+            <a className="secondary-button" href="#tasks">
+              Manage your tasks
+            </a>
+          </div>
         </section>
 
         <section className="modules" id="roadmap">
@@ -120,9 +242,7 @@ function App() {
 
           {!loading && roadmap.length > 0 && (
             <>
-              <p>
-                Completed: {completedCount} / {roadmap.length}
-              </p>
+              <p>Completed: {completedCount} / {roadmap.length}</p>
 
               <div className="progress-section">
                 <div className="progress-label">
@@ -148,43 +268,148 @@ function App() {
           )}
 
           {loading && <p>Loading your roadmap...</p>}
-
           {error && <p role="alert">{error}</p>}
-
           {success && <p role="status">{success}</p>}
 
           {!loading && !error && roadmap.length === 0 && (
             <p>No roadmap modules are available yet.</p>
           )}
 
-          {!loading &&
-            roadmap.map((item) => (
-              <article className="module-card" key={item.id}>
-                <h3>{item.title}</h3>
-                <p>{item.description}</p>
+          {!loading && roadmap.map((item) => (
+            <article className="module-card" key={item.id}>
+              <h3>{item.title}</h3>
+              <p>{item.description}</p>
 
-                <label htmlFor={`status-${item.id}`}>
-                  Progress status:
-                </label>
+              <label htmlFor={`status-${item.id}`}>
+                Progress status:
+              </label>
 
-                <select
-                  id={`status-${item.id}`}
-                  value={item.status}
-                  disabled={updatingId === item.id}
-                  onChange={(event) =>
-                    updateStatus(item.id, event.target.value)
-                  }
+              <select
+                id={`status-${item.id}`}
+                value={item.status}
+                disabled={updatingId === item.id}
+                onChange={(event) => updateStatus(item.id, event.target.value)}
+              >
+                <option value="Not Started">Not Started</option>
+                <option value="In Progress">In Progress</option>
+                <option value="Completed">Completed</option>
+              </select>
+
+              {updatingId === item.id && <p>Saving progress...</p>}
+            </article>
+          ))}
+        </section>
+
+        <section className="tasks-section" id="tasks">
+          <div className="section-heading">
+            <div>
+              <h2>My Tasks</h2>
+              <p>Plan your daily placement preparation.</p>
+            </div>
+
+            <span className="task-count">
+              {completedTasks}/{tasks.length} completed
+            </span>
+          </div>
+
+          <form className="task-form" onSubmit={createTask}>
+            <h3>Create a new task</h3>
+
+            <label htmlFor="task-title">Task title *</label>
+            <input
+              id="task-title"
+              type="text"
+              placeholder="e.g. Solve 3 Java problems"
+              value={title}
+              onChange={(event) => setTitle(event.target.value)}
+              maxLength={150}
+              required
+            />
+
+            <label htmlFor="task-description">Description</label>
+            <textarea
+              id="task-description"
+              placeholder="What do you want to accomplish?"
+              value={description}
+              onChange={(event) => setDescription(event.target.value)}
+              rows={3}
+              maxLength={1000}
+            />
+
+            <label htmlFor="task-date">Due date (optional)</label>
+            <input
+              id="task-date"
+              type="date"
+              value={dueDate}
+              onChange={(event) => setDueDate(event.target.value)}
+            />
+
+            <button type="submit" disabled={savingTask}>
+              {savingTask ? 'Creating task...' : '+ Add task'}
+            </button>
+          </form>
+
+          {taskError && <p role="alert">{taskError}</p>}
+          {taskMessage && <p role="status">{taskMessage}</p>}
+          {tasksLoading && <p>Loading tasks...</p>}
+
+          {!tasksLoading && tasks.length === 0 && (
+            <div className="empty-tasks">
+              <h3>No tasks yet</h3>
+              <p>Create your first task and start making progress!</p>
+            </div>
+          )}
+
+          {!tasksLoading && tasks.length > 0 && (
+            <div className="task-list">
+              {tasks.map((task) => (
+                <article
+                  className={`task-card ${Boolean(task.completed) ? 'task-completed' : ''}`}
+                  key={task.id}
                 >
-                  <option value="Not Started">Not Started</option>
-                  <option value="In Progress">In Progress</option>
-                  <option value="Completed">Completed</option>
-                </select>
+                  <div className="task-card-content">
+                    <h3>{task.title}</h3>
 
-                {updatingId === item.id && (
-                  <p role="status">Saving progress...</p>
-                )}
-              </article>
-            ))}
+                    {task.description && <p>{task.description}</p>}
+
+                    {task.due_date && (
+                      <p className="task-due-date">
+                        Due: {task.due_date}
+                      </p>
+                    )}
+
+                    <span className="task-status">
+                      {Boolean(task.completed) ? 'Completed' : 'In progress'}
+                    </span>
+                  </div>
+
+                  <div className="task-actions">
+                    <button
+                      type="button"
+                      className="complete-button"
+                      disabled={updatingTaskId === task.id}
+                      onClick={() => toggleTask(task)}
+                    >
+                      {updatingTaskId === task.id
+                        ? 'Saving...'
+                        : Boolean(task.completed)
+                          ? 'Mark incomplete'
+                          : 'Mark complete'}
+                    </button>
+
+                    <button
+                      type="button"
+                      className="delete-button"
+                      disabled={deletingTaskId === task.id}
+                      onClick={() => deleteTask(task.id)}
+                    >
+                      {deletingTaskId === task.id ? 'Deleting...' : 'Delete'}
+                    </button>
+                  </div>
+                </article>
+              ))}
+            </div>
+          )}
         </section>
       </main>
     </div>
