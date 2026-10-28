@@ -14,6 +14,7 @@ body {
   min-height: 100vh;
 }
 
+/* Header */
 .header {
   padding: 24px 7%;
   background: #ffffff;
@@ -30,11 +31,13 @@ body {
   color: #64748b;
 }
 
+/* Main content */
 .main {
   width: min(1100px, 92%);
   margin: 40px auto;
 }
 
+/* Welcome section */
 .welcome {
   padding: 36px;
   border-radius: 18px;
@@ -58,12 +61,14 @@ body {
   background: #4f46e5;
   color: white;
   text-decoration: none;
+  transition: background 0.2s ease;
 }
 
 .primary-button:hover {
   background: #3730a3;
 }
 
+/* Placement roadmap */
 .modules {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
@@ -71,16 +76,66 @@ body {
   margin-top: 28px;
 }
 
+.modules > h2,
+.modules > .progress-section,
+.modules > [role="alert"],
+.modules > [role="status"],
+.modules > p,
+.modules > .progress-track {
+  grid-column: 1 / -1;
+}
+
 .module-card {
   padding: 24px;
   background: white;
   border: 1px solid #e5e7eb;
   border-radius: 14px;
+  transition:
+    transform 0.2s ease,
+    box-shadow 0.2s ease;
+}
+
+.module-card:hover {
+  transform: translateY(-3px);
+  box-shadow: 0 8px 24px rgba(23, 32, 51, 0.08);
+}
+
+.module-card h3 {
+  margin-top: 0;
+  color: #172033;
 }
 
 .module-card p {
   color: #64748b;
   line-height: 1.6;
+}
+
+.module-card label {
+  display: block;
+  margin: 16px 0 8px;
+  font-size: 14px;
+  font-weight: bold;
+}
+
+.module-card select {
+  width: 100%;
+  padding: 11px;
+  border: 1px solid #d1d5db;
+  border-radius: 8px;
+  background: #ffffff;
+  color: #172033;
+  font-size: 14px;
+  cursor: pointer;
+}
+
+.module-card select:focus {
+  outline: 2px solid #818cf8;
+  outline-offset: 2px;
+}
+
+.module-card select:disabled {
+  cursor: wait;
+  opacity: 0.6;
 }
 
 .module-card span {
@@ -89,7 +144,67 @@ body {
   font-weight: bold;
 }
 
+/* Progress section */
+.progress-section {
+  margin: 8px 0 20px;
+  padding: 22px;
+  background: #ffffff;
+  border: 1px solid #e5e7eb;
+  border-radius: 14px;
+}
+
+.progress-label {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 12px;
+  color: #172033;
+  font-weight: bold;
+}
+
+.progress-track {
+  width: 100%;
+  height: 12px;
+  overflow: hidden;
+  border-radius: 20px;
+  background: #e5e7eb;
+}
+
+.progress-fill {
+  height: 100%;
+  border-radius: 20px;
+  background: #4f46e5;
+  transition: width 0.4s ease;
+}
+
+/* Success and error messages */
+[role="status"] {
+  color: #15803d;
+  font-weight: bold;
+}
+
+[role="alert"] {
+  color: #dc2626;
+  font-weight: bold;
+}
+
+/* Mobile responsive design */
+@media (max-width: 800px) {
+  .modules {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
 @media (max-width: 650px) {
+  .main {
+    margin: 24px auto;
+  }
+
+  .header {
+    padding: 20px 5%;
+  }
+
   .welcome {
     padding: 24px;
   }
@@ -100,5 +215,9 @@ body {
 
   .modules {
     grid-template-columns: 1fr;
+  }
+
+  .progress-section {
+    padding: 18px;
   }
 }
