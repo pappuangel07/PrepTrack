@@ -59,6 +59,22 @@ db.exec(`
   )
 `);
 
+// Safely add priority to existing databases
+const taskColumns = db.prepare('PRAGMA table_info(tasks)').all();
+const hasPriority = taskColumns.some(
+  (column) => column.name === 'priority'
+);
+
+if (!hasPriority) {
+  db.exec(`
+    ALTER TABLE tasks
+    ADD COLUMN priority TEXT NOT NULL DEFAULT 'Medium'
+  `);
+}
+
+// Allowed task priorities
+const allowedPriorities = ['High', 'Medium', 'Low'];
+
 // Home route
 app.get('/', (req, res) => {
   res.json({
@@ -141,10 +157,12 @@ app.get('/api/tasks', (req, res) => {
 
 // Create a new task
 app.post('/api/tasks', (req, res) => {
+  console.log('Incoming task data:', req.body);
   const {
     title,
     description = '',
-    due_date = null
+    due_date = null,
+    priority = 'Medium'
   } = req.body;
 
   if (typeof title !== 'string' || !title.trim()) {
@@ -169,10 +187,21 @@ app.post('/api/tasks', (req, res) => {
     });
   }
 
+  if (!allowedPriorities.includes(priority)) {
+    return res.status(400).json({
+      message: 'Priority must be High, Medium, or Low'
+    });
+  }
+
   const result = db.prepare(`
-    INSERT INTO tasks (title, description, due_date)
-    VALUES (?, ?, ?)
-  `).run(title.trim(), description.trim(), due_date);
+    INSERT INTO tasks (title, description, due_date, priority)
+    VALUES (?, ?, ?, ?)
+  `).run(
+    title.trim(),
+    description.trim(),
+    due_date,
+    priority
+  );
 
   const newTask = db.prepare(
     'SELECT * FROM tasks WHERE id = ?'
@@ -187,7 +216,13 @@ app.post('/api/tasks', (req, res) => {
 // Update task details and/or completion status
 app.patch('/api/tasks/:id', (req, res) => {
   const id = Number(req.params.id);
-  const { completed, title, description, due_date } = req.body;
+  const {
+    completed,
+    title,
+    description,
+    due_date,
+    priority
+  } = req.body;
 
   if (!Number.isInteger(id) || id < 1) {
     return res.status(400).json({
@@ -212,17 +247,30 @@ app.patch('/api/tasks/:id', (req, res) => {
     });
   }
 
+  // Validate priority if provided
+  if (
+    priority !== undefined &&
+    !allowedPriorities.includes(priority)
+  ) {
+    return res.status(400).json({
+      message: 'Priority must be High, Medium, or Low'
+    });
+  }
+
   // Validate and update task details if provided
   if (
     title !== undefined ||
     description !== undefined ||
-    due_date !== undefined
+    due_date !== undefined ||
+    priority !== undefined
   ) {
     const newTitle = title !== undefined ? title : task.title;
     const newDescription =
       description !== undefined ? description : task.description;
     const newDueDate =
       due_date !== undefined ? due_date : task.due_date;
+    const newPriority =
+      priority !== undefined ? priority : task.priority;
 
     if (typeof newTitle !== 'string' || !newTitle.trim()) {
       return res.status(400).json({
@@ -248,12 +296,13 @@ app.patch('/api/tasks/:id', (req, res) => {
 
     db.prepare(`
       UPDATE tasks
-      SET title = ?, description = ?, due_date = ?
+      SET title = ?, description = ?, due_date = ?, priority = ?
       WHERE id = ?
     `).run(
       newTitle.trim(),
       newDescription.trim(),
       newDueDate,
+      newPriority,
       id
     );
   }
