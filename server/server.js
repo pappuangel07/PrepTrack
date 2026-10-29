@@ -71,6 +71,21 @@ if (!hasPriority) {
     ADD COLUMN priority TEXT NOT NULL DEFAULT 'Medium'
   `);
 }
+// Safely add deleted flag to existing databases
+const taskColumnsAfterPriority = db.prepare(
+  'PRAGMA table_info(tasks)'
+).all();
+
+const hasDeleted = taskColumnsAfterPriority.some(
+  (column) => column.name === 'deleted'
+);
+
+if (!hasDeleted) {
+  db.exec(`
+    ALTER TABLE tasks
+    ADD COLUMN deleted INTEGER NOT NULL DEFAULT 0
+  `);
+}
 
 // Allowed task priorities
 const allowedPriorities = ['High', 'Medium', 'Low'];
@@ -145,11 +160,10 @@ app.patch('/api/roadmap/:id', (req, res) => {
 // ======================================
 // TASK MANAGEMENT API
 // ======================================
-
-// Get all tasks
+// Get all active tasks
 app.get('/api/tasks', (req, res) => {
   const tasks = db.prepare(
-    'SELECT * FROM tasks ORDER BY id DESC'
+    'SELECT * FROM tasks WHERE deleted = 0 ORDER BY id DESC'
   ).all();
 
   res.json(tasks);
@@ -324,7 +338,7 @@ app.patch('/api/tasks/:id', (req, res) => {
   });
 });
 
-// Delete a task
+// Soft delete a task
 app.delete('/api/tasks/:id', (req, res) => {
   const id = Number(req.params.id);
 
@@ -335,7 +349,7 @@ app.delete('/api/tasks/:id', (req, res) => {
   }
 
   const result = db.prepare(
-    'DELETE FROM tasks WHERE id = ?'
+    'UPDATE tasks SET deleted = 1 WHERE id = ? AND deleted = 0'
   ).run(id);
 
   if (result.changes === 0) {
@@ -346,6 +360,35 @@ app.delete('/api/tasks/:id', (req, res) => {
 
   res.json({
     message: 'Task deleted successfully'
+  });
+});
+// Restore a deleted task
+app.patch('/api/tasks/:id/restore', (req, res) => {
+  const id = Number(req.params.id);
+
+  if (!Number.isInteger(id) || id < 1) {
+    return res.status(400).json({
+      message: 'Invalid task ID'
+    });
+  }
+
+  const result = db.prepare(
+    'UPDATE tasks SET deleted = 0 WHERE id = ? AND deleted = 1'
+  ).run(id);
+
+  if (result.changes === 0) {
+    return res.status(404).json({
+      message: 'Deleted task not found'
+    });
+  }
+
+  const task = db.prepare(
+    'SELECT * FROM tasks WHERE id = ?'
+  ).get(id);
+
+  res.json({
+    message: 'Task restored successfully',
+    task
   });
 });
 

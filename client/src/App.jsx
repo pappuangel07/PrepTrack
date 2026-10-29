@@ -16,6 +16,7 @@ function App() {
   const [savingTask, setSavingTask] = useState(false);
   const [updatingTaskId, setUpdatingTaskId] = useState(null);
   const [deletingTaskId, setDeletingTaskId] = useState(null);
+  const [deletedTask, setDeletedTask] = useState(null);
 
   const [editingTaskId, setEditingTaskId] = useState(null);
   const [editTitle, setEditTitle] = useState('');
@@ -246,13 +247,23 @@ async function toggleTask(task) {
     setUpdatingTaskId(null);
   }
 }
-  // Delete a task
+
+  // Delete a task but keep it available for Undo
   async function deleteTask(id) {
     const confirmed = window.confirm(
       'Are you sure you want to delete this task?'
     );
 
     if (!confirmed) return;
+
+    const taskToDelete = tasks.find(
+      (task) => task.id === id
+    );
+
+    if (!taskToDelete) {
+      setTaskError('Task not found.');
+      return;
+    }
 
     setDeletingTaskId(id);
     setTaskError('');
@@ -269,14 +280,54 @@ async function toggleTask(task) {
         throw new Error(data.message || 'Unable to delete task.');
       }
 
-      setTasks((current) => current.filter((task) => task.id !== id));
-      setTaskMessage('Task deleted successfully!');
+      setTasks((current) =>
+        current.filter((task) => task.id !== id)
+      );
+
+      setDeletedTask(taskToDelete);
+      setTaskMessage('Task deleted successfully.');
     } catch (err) {
       setTaskError(err.message || 'Unable to delete task.');
     } finally {
       setDeletingTaskId(null);
     }
   }
+
+  // Undo task deletion
+  async function undoDelete() {
+    if (!deletedTask) return;
+
+    const taskToRestore = deletedTask;
+
+    setTaskError('');
+    setTaskMessage('');
+
+    try {
+      const response = await fetch(
+        `/api/tasks/${taskToRestore.id}/restore`,
+        {
+          method: 'PATCH',
+        }
+      );
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.message || 'Unable to restore task.');
+      }
+
+      if (!data.task) {
+        throw new Error('Task restored, but task data is missing.');
+      }
+
+      setTasks((current) => [data.task, ...current]);
+      setDeletedTask(null);
+      setTaskMessage('Task restored successfully!');
+    } catch (err) {
+      setTaskError(err.message || 'Unable to restore task.');
+    }
+  }
+
 
   // Start editing a task
   function startEditingTask(task) {
@@ -620,9 +671,28 @@ const overdueTasks = tasks.filter(
             </button>
           </form>
 
-          {taskError && <p role="alert">{taskError}</p>}
-          {taskMessage && <p role="status">{taskMessage}</p>}
-          {tasksLoading && <p>Loading tasks...</p>}
+
+  {taskError && <p role="alert">{taskError}</p>}
+
+  {taskMessage && (
+    <p role="status">
+      {taskMessage}
+      {deletedTask && (
+        <>
+          {' '}
+          <button
+            type="button"
+            onClick={undoDelete}
+          >
+            Undo
+          </button>
+        </>
+      )}
+    </p>
+  )}
+
+  {tasksLoading && <p>Loading tasks...</p>}
+
 
           {!tasksLoading && tasks.length === 0 && (
             <div className="empty-tasks">
