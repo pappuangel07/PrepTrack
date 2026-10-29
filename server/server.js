@@ -34,24 +34,9 @@ if (roadmapCount.count === 0) {
   `);
 
   const initialItems = [
-    [
-      1,
-      'Java',
-      'Learn programming fundamentals and OOP.',
-      'Not Started'
-    ],
-    [
-      2,
-      'Data Structures and Algorithms',
-      'Learn DSA concepts and solve coding problems.',
-      'Not Started'
-    ],
-    [
-      3,
-      'Aptitude',
-      'Practice quantitative, logical and verbal reasoning.',
-      'Not Started'
-    ]
+    [1, 'Java', 'Learn programming fundamentals and OOP.', 'Not Started'],
+    [2, 'Data Structures and Algorithms', 'Learn DSA concepts and solve coding problems.', 'Not Started'],
+    [3, 'Aptitude', 'Practice quantitative, logical and verbal reasoning.', 'Not Started']
   ];
 
   const insertMany = db.transaction((items) => {
@@ -156,7 +141,11 @@ app.get('/api/tasks', (req, res) => {
 
 // Create a new task
 app.post('/api/tasks', (req, res) => {
-  const { title, description = '', due_date = null } = req.body;
+  const {
+    title,
+    description = '',
+    due_date = null
+  } = req.body;
 
   if (typeof title !== 'string' || !title.trim()) {
     return res.status(400).json({
@@ -195,20 +184,14 @@ app.post('/api/tasks', (req, res) => {
   });
 });
 
-// Mark a task as completed or incomplete
+// Update task details and/or completion status
 app.patch('/api/tasks/:id', (req, res) => {
   const id = Number(req.params.id);
-  const { completed } = req.body;
+  const { completed, title, description, due_date } = req.body;
 
   if (!Number.isInteger(id) || id < 1) {
     return res.status(400).json({
       message: 'Invalid task ID'
-    });
-  }
-
-  if (typeof completed !== 'boolean') {
-    return res.status(400).json({
-      message: 'Completed must be true or false'
     });
   }
 
@@ -222,9 +205,65 @@ app.patch('/api/tasks/:id', (req, res) => {
     });
   }
 
-  db.prepare(
-    'UPDATE tasks SET completed = ? WHERE id = ?'
-  ).run(completed ? 1 : 0, id);
+  // Validate completion status if provided
+  if (completed !== undefined && typeof completed !== 'boolean') {
+    return res.status(400).json({
+      message: 'Completed must be true or false'
+    });
+  }
+
+  // Validate and update task details if provided
+  if (
+    title !== undefined ||
+    description !== undefined ||
+    due_date !== undefined
+  ) {
+    const newTitle = title !== undefined ? title : task.title;
+    const newDescription =
+      description !== undefined ? description : task.description;
+    const newDueDate =
+      due_date !== undefined ? due_date : task.due_date;
+
+    if (typeof newTitle !== 'string' || !newTitle.trim()) {
+      return res.status(400).json({
+        message: 'Task title is required'
+      });
+    }
+
+    if (typeof newDescription !== 'string') {
+      return res.status(400).json({
+        message: 'Description must be text'
+      });
+    }
+
+    if (
+      newDueDate !== null &&
+      (typeof newDueDate !== 'string' ||
+        !/^\d{4}-\d{2}-\d{2}$/.test(newDueDate))
+    ) {
+      return res.status(400).json({
+        message: 'Due date must use YYYY-MM-DD format'
+      });
+    }
+
+    db.prepare(`
+      UPDATE tasks
+      SET title = ?, description = ?, due_date = ?
+      WHERE id = ?
+    `).run(
+      newTitle.trim(),
+      newDescription.trim(),
+      newDueDate,
+      id
+    );
+  }
+
+  // Update completion status if provided
+  if (completed !== undefined) {
+    db.prepare(
+      'UPDATE tasks SET completed = ? WHERE id = ?'
+    ).run(completed ? 1 : 0, id);
+  }
 
   const updatedTask = db.prepare(
     'SELECT * FROM tasks WHERE id = ?'

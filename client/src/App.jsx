@@ -16,6 +16,11 @@ function App() {
   const [savingTask, setSavingTask] = useState(false);
   const [updatingTaskId, setUpdatingTaskId] = useState(null);
   const [deletingTaskId, setDeletingTaskId] = useState(null);
+  const [editingTaskId, setEditingTaskId] = useState(null);
+const [editTitle, setEditTitle] = useState('');
+const [editDescription, setEditDescription] = useState('');
+const [editDueDate, setEditDueDate] = useState('');
+const [savingEdit, setSavingEdit] = useState(false);
 
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
@@ -199,6 +204,75 @@ function App() {
       setDeletingTaskId(null);
     }
   }
+  // Start editing a task
+  function startEditingTask(task) {
+    setEditingTaskId(task.id);
+    setEditTitle(task.title);
+    setEditDescription(task.description || '');
+    setEditDueDate(task.due_date || '');
+    setTaskError('');
+    setTaskMessage('');
+  }
+
+  // Cancel editing
+  function cancelEditingTask() {
+    setEditingTaskId(null);
+    setEditTitle('');
+    setEditDescription('');
+    setEditDueDate('');
+    setTaskError('');
+  }
+
+  // Save edited task
+  async function saveEditedTask(event) {
+    event.preventDefault();
+
+    if (!editTitle.trim()) {
+      setTaskError('Please enter a task title.');
+      return;
+    }
+
+    setSavingEdit(true);
+    setTaskError('');
+    setTaskMessage('');
+
+    try {
+      const response = await fetch(`/api/tasks/${editingTaskId}`, {
+        method: 'PATCH',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          title: editTitle.trim(),
+          description: editDescription.trim(),
+          due_date: editDueDate || null
+        })
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.message || 'Unable to edit task.');
+      }
+
+      setTasks((current) =>
+        current.map((task) =>
+          task.id === editingTaskId ? data.task : task
+        )
+      );
+
+      setTaskMessage('Task updated successfully!');
+      setEditingTaskId(null);
+      setEditTitle('');
+      setEditDescription('');
+      setEditDueDate('');
+    } catch (err) {
+      setTaskError(err.message || 'Unable to edit task.');
+    } finally {
+      setSavingEdit(false);
+    }
+  }
+
 
   const completedCount = roadmap.filter(
     (item) => item.status === 'Completed'
@@ -364,49 +438,107 @@ function App() {
             <div className="task-list">
               {tasks.map((task) => (
                 <article
-                  className={`task-card ${Boolean(task.completed) ? 'task-completed' : ''}`}
-                  key={task.id}
-                >
-                  <div className="task-card-content">
-                    <h3>{task.title}</h3>
+  className={`task-card ${Boolean(task.completed) ? 'task-completed' : ''}`}
+  key={task.id}
+>
+  {editingTaskId === task.id ? (
+    <form className="task-form task-edit-form" onSubmit={saveEditedTask}>
+      <h3>Edit task</h3>
 
-                    {task.description && <p>{task.description}</p>}
+      <label htmlFor={`edit-title-${task.id}`}>Task title *</label>
+      <input
+        id={`edit-title-${task.id}`}
+        type="text"
+        value={editTitle}
+        onChange={(event) => setEditTitle(event.target.value)}
+        maxLength={150}
+        required
+      />
 
-                    {task.due_date && (
-                      <p className="task-due-date">
-                        Due: {task.due_date}
-                      </p>
-                    )}
+      <label htmlFor={`edit-description-${task.id}`}>Description</label>
+      <textarea
+        id={`edit-description-${task.id}`}
+        value={editDescription}
+        onChange={(event) => setEditDescription(event.target.value)}
+        rows={3}
+        maxLength={1000}
+      />
 
-                    <span className="task-status">
-                      {Boolean(task.completed) ? 'Completed' : 'In progress'}
-                    </span>
-                  </div>
+      <label htmlFor={`edit-date-${task.id}`}>Due date (optional)</label>
+      <input
+        id={`edit-date-${task.id}`}
+        type="date"
+        value={editDueDate}
+        onChange={(event) => setEditDueDate(event.target.value)}
+      />
 
-                  <div className="task-actions">
-                    <button
-                      type="button"
-                      className="complete-button"
-                      disabled={updatingTaskId === task.id}
-                      onClick={() => toggleTask(task)}
-                    >
-                      {updatingTaskId === task.id
-                        ? 'Saving...'
-                        : Boolean(task.completed)
-                          ? 'Mark incomplete'
-                          : 'Mark complete'}
-                    </button>
+      <div className="task-actions">
+        <button type="submit" disabled={savingEdit}>
+          {savingEdit ? 'Saving...' : 'Save changes'}
+        </button>
 
-                    <button
-                      type="button"
-                      className="delete-button"
-                      disabled={deletingTaskId === task.id}
-                      onClick={() => deleteTask(task.id)}
-                    >
-                      {deletingTaskId === task.id ? 'Deleting...' : 'Delete'}
-                    </button>
-                  </div>
-                </article>
+        <button
+          type="button"
+          className="delete-button"
+          disabled={savingEdit}
+          onClick={cancelEditingTask}
+        >
+          Cancel
+        </button>
+      </div>
+    </form>
+  ) : (
+    <>
+      <div className="task-card-content">
+        <h3>{task.title}</h3>
+
+        {task.description && <p>{task.description}</p>}
+
+        {task.due_date && (
+          <p className="task-due-date">Due: {task.due_date}</p>
+        )}
+
+        <span className="task-status">
+          {Boolean(task.completed) ? 'Completed' : 'In progress'}
+        </span>
+      </div>
+
+      <div className="task-actions">
+        <button
+          type="button"
+          className="complete-button"
+          disabled={updatingTaskId === task.id || editingTaskId !== null}
+          onClick={() => toggleTask(task)}
+        >
+          {updatingTaskId === task.id
+            ? 'Saving...'
+            : Boolean(task.completed)
+              ? 'Mark incomplete'
+              : 'Mark complete'}
+        </button>
+
+        <button
+          type="button"
+          className="complete-button"
+          disabled={editingTaskId !== null || deletingTaskId === task.id}
+          onClick={() => startEditingTask(task)}
+        >
+          Edit
+        </button>
+
+        <button
+          type="button"
+          className="delete-button"
+          disabled={deletingTaskId === task.id || editingTaskId !== null}
+          onClick={() => deleteTask(task.id)}
+        >
+          {deletingTaskId === task.id ? 'Deleting...' : 'Delete'}
+        </button>
+      </div>
+    </>
+  )}
+</article>
+
               ))}
             </div>
           )}
