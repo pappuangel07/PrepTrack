@@ -28,27 +28,58 @@ function App() {
   const [description, setDescription] = useState('');
   const [dueDate, setDueDate] = useState('');
   const [priority, setPriority] = useState('Medium');
+
   const [searchTerm, setSearchTerm] = useState('');
-const [priorityFilter, setPriorityFilter] = useState('All');
-const [statusFilter, setStatusFilter] = useState('All');
+  const [priorityFilter, setPriorityFilter] = useState('All');
+  const [statusFilter, setStatusFilter] = useState('All');
+  const [sortBy, setSortBy] = useState('Newest First');
 
   const priorities = ['High', 'Medium', 'Low'];
+
+  // Search and filter tasks
   const filteredTasks = tasks.filter((task) => {
-  const matchesSearch = task.title
-    .toLowerCase()
-    .includes(searchTerm.trim().toLowerCase());
+    const matchesSearch = (task.title || '')
+      .toLowerCase()
+      .includes(searchTerm.trim().toLowerCase());
 
-  const matchesPriority =
-    priorityFilter === 'All' ||
-    (task.priority || 'Medium') === priorityFilter;
+    const matchesPriority =
+      priorityFilter === 'All' ||
+      (task.priority || 'Medium') === priorityFilter;
 
-  const matchesStatus =
-    statusFilter === 'All' ||
-    (statusFilter === 'Completed' && Boolean(task.completed)) ||
-    (statusFilter === 'Pending' && !Boolean(task.completed));
+    const matchesStatus =
+      statusFilter === 'All' ||
+      (statusFilter === 'Completed' && Boolean(task.completed)) ||
+      (statusFilter === 'Pending' && !Boolean(task.completed));
 
-  return matchesSearch && matchesPriority && matchesStatus;
-});
+    return matchesSearch && matchesPriority && matchesStatus;
+  });
+
+  // Sort the filtered tasks
+  const sortedTasks = [...filteredTasks].sort((a, b) => {
+    if (sortBy === 'Priority') {
+      const priorityOrder = {
+        High: 1,
+        Medium: 2,
+        Low: 3,
+      };
+
+      return (
+        (priorityOrder[a.priority || 'Medium'] || 2) -
+        (priorityOrder[b.priority || 'Medium'] || 2)
+      );
+    }
+
+    if (sortBy === 'Due Date') {
+      if (!a.due_date && !b.due_date) return 0;
+      if (!a.due_date) return 1;
+      if (!b.due_date) return -1;
+
+      return a.due_date.localeCompare(b.due_date);
+    }
+
+    // Newest First
+    return Number(b.id) - Number(a.id);
+  });
 
   // Load roadmap and tasks from the backend
   useEffect(() => {
@@ -99,9 +130,9 @@ const [statusFilter, setStatusFilter] = useState('All');
       const response = await fetch(`/api/roadmap/${id}`, {
         method: 'PATCH',
         headers: {
-          'Content-Type': 'application/json'
+          'Content-Type': 'application/json',
         },
-        body: JSON.stringify({ status: newStatus })
+        body: JSON.stringify({ status: newStatus }),
       });
 
       const data = await response.json();
@@ -111,7 +142,7 @@ const [statusFilter, setStatusFilter] = useState('All');
       }
 
       setRoadmap((current) =>
-        current.map((item) => item.id === id ? data.item : item)
+        current.map((item) => (item.id === id ? data.item : item))
       );
 
       setSuccess(`${data.item.title} progress saved successfully!`);
@@ -139,14 +170,14 @@ const [statusFilter, setStatusFilter] = useState('All');
       const response = await fetch('/api/tasks', {
         method: 'POST',
         headers: {
-          'Content-Type': 'application/json'
+          'Content-Type': 'application/json',
         },
         body: JSON.stringify({
           title: title.trim(),
           description: description.trim(),
           due_date: dueDate || null,
-          priority
-        })
+          priority,
+        }),
       });
 
       const data = await response.json();
@@ -178,11 +209,11 @@ const [statusFilter, setStatusFilter] = useState('All');
       const response = await fetch(`/api/tasks/${task.id}`, {
         method: 'PATCH',
         headers: {
-          'Content-Type': 'application/json'
+          'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          completed: !Boolean(task.completed)
-        })
+          completed: !Boolean(task.completed),
+        }),
       });
 
       const data = await response.json();
@@ -192,7 +223,7 @@ const [statusFilter, setStatusFilter] = useState('All');
       }
 
       setTasks((current) =>
-        current.map((item) => item.id === task.id ? data.task : item)
+        current.map((item) => (item.id === task.id ? data.task : item))
       );
 
       setTaskMessage('Task progress saved!');
@@ -217,7 +248,7 @@ const [statusFilter, setStatusFilter] = useState('All');
 
     try {
       const response = await fetch(`/api/tasks/${id}`, {
-        method: 'DELETE'
+        method: 'DELETE',
       });
 
       const data = await response.json();
@@ -273,14 +304,14 @@ const [statusFilter, setStatusFilter] = useState('All');
       const response = await fetch(`/api/tasks/${editingTaskId}`, {
         method: 'PATCH',
         headers: {
-          'Content-Type': 'application/json'
+          'Content-Type': 'application/json',
         },
         body: JSON.stringify({
           title: editTitle.trim(),
           description: editDescription.trim(),
           due_date: editDueDate || null,
-          priority: editPriority
-        })
+          priority: editPriority,
+        }),
       });
 
       const data = await response.json();
@@ -312,9 +343,10 @@ const [statusFilter, setStatusFilter] = useState('All');
     (item) => item.status === 'Completed'
   ).length;
 
-  const progressPercentage = roadmap.length === 0
-    ? 0
-    : Math.round((completedCount / roadmap.length) * 100);
+  const progressPercentage =
+    roadmap.length === 0
+      ? 0
+      : Math.round((completedCount / roadmap.length) * 100);
 
   const completedTasks = tasks.filter(
     (task) => Boolean(task.completed)
@@ -350,7 +382,9 @@ const [statusFilter, setStatusFilter] = useState('All');
 
           {!loading && roadmap.length > 0 && (
             <>
-              <p>Completed: {completedCount} / {roadmap.length}</p>
+              <p>
+                Completed: {completedCount} / {roadmap.length}
+              </p>
 
               <div className="progress-section">
                 <div className="progress-label">
@@ -383,29 +417,32 @@ const [statusFilter, setStatusFilter] = useState('All');
             <p>No roadmap modules are available yet.</p>
           )}
 
-          {!loading && roadmap.map((item) => (
-            <article className="module-card" key={item.id}>
-              <h3>{item.title}</h3>
-              <p>{item.description}</p>
+          {!loading &&
+            roadmap.map((item) => (
+              <article className="module-card" key={item.id}>
+                <h3>{item.title}</h3>
+                <p>{item.description}</p>
 
-              <label htmlFor={`status-${item.id}`}>
-                Progress status:
-              </label>
+                <label htmlFor={`status-${item.id}`}>
+                  Progress status:
+                </label>
 
-              <select
-                id={`status-${item.id}`}
-                value={item.status}
-                disabled={updatingId === item.id}
-                onChange={(event) => updateStatus(item.id, event.target.value)}
-              >
-                <option value="Not Started">Not Started</option>
-                <option value="In Progress">In Progress</option>
-                <option value="Completed">Completed</option>
-              </select>
+                <select
+                  id={`status-${item.id}`}
+                  value={item.status}
+                  disabled={updatingId === item.id}
+                  onChange={(event) =>
+                    updateStatus(item.id, event.target.value)
+                  }
+                >
+                  <option value="Not Started">Not Started</option>
+                  <option value="In Progress">In Progress</option>
+                  <option value="Completed">Completed</option>
+                </select>
 
-              {updatingId === item.id && <p>Saving progress...</p>}
-            </article>
-          ))}
+                {updatingId === item.id && <p>Saving progress...</p>}
+              </article>
+            ))}
         </section>
 
         <section className="tasks-section" id="tasks">
@@ -419,36 +456,49 @@ const [statusFilter, setStatusFilter] = useState('All');
               {completedTasks}/{tasks.length} completed
             </span>
           </div>
+
+          {/* Search, filters and sorting */}
           <div className="task-filters">
-  <input
-    type="text"
-    placeholder="Search tasks by title..."
-    value={searchTerm}
-    onChange={(event) => setSearchTerm(event.target.value)}
-    aria-label="Search tasks by title"
-  />
+            <input
+              type="text"
+              placeholder="Search tasks by title..."
+              value={searchTerm}
+              onChange={(event) => setSearchTerm(event.target.value)}
+              aria-label="Search tasks by title"
+            />
 
-  <select
-    value={priorityFilter}
-    onChange={(event) => setPriorityFilter(event.target.value)}
-    aria-label="Filter tasks by priority"
-  >
-    <option value="All">All priorities</option>
-    <option value="High">High priority</option>
-    <option value="Medium">Medium priority</option>
-    <option value="Low">Low priority</option>
-  </select>
+            <select
+              value={priorityFilter}
+              onChange={(event) => setPriorityFilter(event.target.value)}
+              aria-label="Filter tasks by priority"
+            >
+              <option value="All">All priorities</option>
+              <option value="High">High priority</option>
+              <option value="Medium">Medium priority</option>
+              <option value="Low">Low priority</option>
+            </select>
 
-  <select
-    value={statusFilter}
-    onChange={(event) => setStatusFilter(event.target.value)}
-    aria-label="Filter tasks by status"
-  >
-    <option value="All">All statuses</option>
-    <option value="Pending">Pending</option>
-    <option value="Completed">Completed</option>
-  </select>
-</div>
+            <select
+              value={statusFilter}
+              onChange={(event) => setStatusFilter(event.target.value)}
+              aria-label="Filter tasks by status"
+            >
+              <option value="All">All statuses</option>
+              <option value="Pending">Pending</option>
+              <option value="Completed">Completed</option>
+            </select>
+
+            <select
+              value={sortBy}
+              onChange={(event) => setSortBy(event.target.value)}
+              aria-label="Sort tasks"
+            >
+              <option value="Newest First">Newest First</option>
+              <option value="Due Date">Due Date</option>
+              <option value="Priority">Priority</option>
+            </select>
+          </div>
+
           <form className="task-form" onSubmit={createTask}>
             <h3>Create a new task</h3>
 
@@ -488,7 +538,9 @@ const [statusFilter, setStatusFilter] = useState('All');
               onChange={(event) => setPriority(event.target.value)}
             >
               {priorities.map((item) => (
-                <option key={item} value={item}>{item}</option>
+                <option key={item} value={item}>
+                  {item}
+                </option>
               ))}
             </select>
 
@@ -500,7 +552,6 @@ const [statusFilter, setStatusFilter] = useState('All');
           {taskError && <p role="alert">{taskError}</p>}
           {taskMessage && <p role="status">{taskMessage}</p>}
           {tasksLoading && <p>Loading tasks...</p>}
-
 
           {!tasksLoading && tasks.length === 0 && (
             <div className="empty-tasks">
@@ -528,12 +579,13 @@ const [statusFilter, setStatusFilter] = useState('All');
               </div>
             )}
 
-          {!tasksLoading && filteredTasks.length > 0 && (
+          {!tasksLoading && sortedTasks.length > 0 && (
             <div className="task-list">
-              {filteredTasks.map((task) => (
-
+              {sortedTasks.map((task) => (
                 <article
-                  className={`task-card ${Boolean(task.completed) ? 'task-completed' : ''}`}
+                  className={`task-card ${
+                    Boolean(task.completed) ? 'task-completed' : ''
+                  }`}
                   key={task.id}
                 >
                   {editingTaskId === task.id ? (
@@ -550,7 +602,9 @@ const [statusFilter, setStatusFilter] = useState('All');
                         id={`edit-title-${task.id}`}
                         type="text"
                         value={editTitle}
-                        onChange={(event) => setEditTitle(event.target.value)}
+                        onChange={(event) =>
+                          setEditTitle(event.target.value)
+                        }
                         maxLength={150}
                         required
                       />
@@ -561,7 +615,9 @@ const [statusFilter, setStatusFilter] = useState('All');
                       <textarea
                         id={`edit-description-${task.id}`}
                         value={editDescription}
-                        onChange={(event) => setEditDescription(event.target.value)}
+                        onChange={(event) =>
+                          setEditDescription(event.target.value)
+                        }
                         rows={3}
                         maxLength={1000}
                       />
@@ -573,7 +629,9 @@ const [statusFilter, setStatusFilter] = useState('All');
                         id={`edit-date-${task.id}`}
                         type="date"
                         value={editDueDate}
-                        onChange={(event) => setEditDueDate(event.target.value)}
+                        onChange={(event) =>
+                          setEditDueDate(event.target.value)
+                        }
                       />
 
                       <label htmlFor={`edit-priority-${task.id}`}>
@@ -582,10 +640,14 @@ const [statusFilter, setStatusFilter] = useState('All');
                       <select
                         id={`edit-priority-${task.id}`}
                         value={editPriority}
-                        onChange={(event) => setEditPriority(event.target.value)}
+                        onChange={(event) =>
+                          setEditPriority(event.target.value)
+                        }
                       >
                         {priorities.map((item) => (
-                          <option key={item} value={item}>{item}</option>
+                          <option key={item} value={item}>
+                            {item}
+                          </option>
                         ))}
                       </select>
 
@@ -611,37 +673,45 @@ const [statusFilter, setStatusFilter] = useState('All');
 
                         {task.description && <p>{task.description}</p>}
 
-                       
-{task.due_date && (
-  <p
-    className={`task-due-date ${
-      !Boolean(task.completed) &&
-      task.due_date < new Date().toLocaleDateString('en-CA')
-        ? 'due-overdue'
-        : !Boolean(task.completed) &&
-            task.due_date === new Date().toLocaleDateString('en-CA')
-          ? 'due-today'
-          : 'due-upcoming'
-    }`}
-  >
-    {Boolean(task.completed)
-      ? 'Due: '
-      : task.due_date < new Date().toLocaleDateString('en-CA')
-        ? 'Overdue: '
-        : task.due_date === new Date().toLocaleDateString('en-CA')
-          ? 'Due today: '
-          : 'Due: '}
-    {task.due_date}
-  </p>
-)}
+                        {task.due_date && (
+                          <p
+                            className={`task-due-date ${
+                              !Boolean(task.completed) &&
+                              task.due_date <
+                                new Date().toLocaleDateString('en-CA')
+                                ? 'due-overdue'
+                                : !Boolean(task.completed) &&
+                                    task.due_date ===
+                                      new Date().toLocaleDateString('en-CA')
+                                  ? 'due-today'
+                                  : 'due-upcoming'
+                            }`}
+                          >
+                            {Boolean(task.completed)
+                              ? 'Due: '
+                              : task.due_date <
+                                  new Date().toLocaleDateString('en-CA')
+                                ? 'Overdue: '
+                                : task.due_date ===
+                                    new Date().toLocaleDateString('en-CA')
+                                  ? 'Due today: '
+                                  : 'Due: '}
+                            {task.due_date}
+                          </p>
+                        )}
 
-
-                        <span className={`priority-badge priority-${(task.priority || 'Medium').toLowerCase()}`}>
+                        <span
+                          className={`priority-badge priority-${(
+                            task.priority || 'Medium'
+                          ).toLowerCase()}`}
+                        >
                           {task.priority || 'Medium'} Priority
                         </span>
 
                         <span className="task-status">
-                          {Boolean(task.completed) ? 'Completed' : 'In progress'}
+                          {Boolean(task.completed)
+                            ? 'Completed'
+                            : 'In progress'}
                         </span>
                       </div>
 
@@ -649,7 +719,10 @@ const [statusFilter, setStatusFilter] = useState('All');
                         <button
                           type="button"
                           className="complete-button"
-                          disabled={updatingTaskId === task.id || editingTaskId !== null}
+                          disabled={
+                            updatingTaskId === task.id ||
+                            editingTaskId !== null
+                          }
                           onClick={() => toggleTask(task)}
                         >
                           {updatingTaskId === task.id
@@ -662,7 +735,10 @@ const [statusFilter, setStatusFilter] = useState('All');
                         <button
                           type="button"
                           className="complete-button"
-                          disabled={editingTaskId !== null || deletingTaskId === task.id}
+                          disabled={
+                            editingTaskId !== null ||
+                            deletingTaskId === task.id
+                          }
                           onClick={() => startEditingTask(task)}
                         >
                           Edit
@@ -671,10 +747,15 @@ const [statusFilter, setStatusFilter] = useState('All');
                         <button
                           type="button"
                           className="delete-button"
-                          disabled={deletingTaskId === task.id || editingTaskId !== null}
+                          disabled={
+                            deletingTaskId === task.id ||
+                            editingTaskId !== null
+                          }
                           onClick={() => deleteTask(task.id)}
                         >
-                          {deletingTaskId === task.id ? 'Deleting...' : 'Delete'}
+                          {deletingTaskId === task.id
+                            ? 'Deleting...'
+                            : 'Delete'}
                         </button>
                       </div>
                     </>
