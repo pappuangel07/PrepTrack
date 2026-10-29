@@ -17,6 +17,8 @@ function App() {
   const [updatingTaskId, setUpdatingTaskId] = useState(null);
   const [deletingTaskId, setDeletingTaskId] = useState(null);
   const [deletedTask, setDeletedTask] = useState(null);
+  const [undoTimeout, setUndoTimeout] = useState(null); 
+  const [undoSeconds, setUndoSeconds] = useState(0);
 
   const [editingTaskId, setEditingTaskId] = useState(null);
   const [editTitle, setEditTitle] = useState('');
@@ -286,6 +288,32 @@ async function toggleTask(task) {
 
       setDeletedTask(taskToDelete);
       setTaskMessage('Task deleted successfully.');
+      if (undoTimeout) {
+  window.clearTimeout(undoTimeout);
+}
+
+setUndoSeconds(5);
+
+const intervalId = window.setInterval(() => {
+  setUndoSeconds((seconds) => {
+    if (seconds <= 1) {
+      window.clearInterval(intervalId);
+      return 0;
+    }
+
+    return seconds - 1;
+  });
+}, 1000);
+
+const timeoutId = window.setTimeout(() => {
+  window.clearInterval(intervalId);
+  setDeletedTask(null);
+  setTaskMessage('');
+  setUndoTimeout(null);
+  setUndoSeconds(0);
+}, 5000);
+
+setUndoTimeout(timeoutId);
     } catch (err) {
       setTaskError(err.message || 'Unable to delete task.');
     } finally {
@@ -320,9 +348,14 @@ async function toggleTask(task) {
         throw new Error('Task restored, but task data is missing.');
       }
 
-      setTasks((current) => [data.task, ...current]);
-      setDeletedTask(null);
-      setTaskMessage('Task restored successfully!');
+     if (undoTimeout) {
+  window.clearTimeout(undoTimeout);
+}
+
+setUndoTimeout(null);
+setTasks((current) => [data.task, ...current]);
+setDeletedTask(null);
+setTaskMessage('Task restored successfully!');
     } catch (err) {
       setTaskError(err.message || 'Unable to restore task.');
     }
@@ -677,17 +710,21 @@ const overdueTasks = tasks.filter(
   {taskMessage && (
     <p role="status">
       {taskMessage}
-      {deletedTask && (
-        <>
-          {' '}
-          <button
-            type="button"
-            onClick={undoDelete}
-          >
-            Undo
-          </button>
-        </>
-      )}
+     {deletedTask && (
+  <>
+    {' '}
+    <span>
+      Undo available for {undoSeconds} seconds
+    </span>
+    {' '}
+    <button
+      type="button"
+      onClick={undoDelete}
+    >
+      Undo
+    </button>
+  </>
+)}
     </p>
   )}
 
