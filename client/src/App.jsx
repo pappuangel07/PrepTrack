@@ -352,6 +352,10 @@ function App() {
     (task) => Boolean(task.completed)
   ).length;
 const pendingTasks = tasks.length - completedTasks;
+const taskProgressPercentage =
+  tasks.length === 0
+    ? 0
+    : Math.round((completedTasks / tasks.length) * 100);
 
 const overdueTasks = tasks.filter(
   (task) =>
@@ -485,6 +489,32 @@ const overdueTasks = tasks.filter(
     <strong>{overdueTasks}</strong>
   </article>
 </div>
+
+<div className="task-progress-section">
+  <div className="task-progress-label">
+    <span>Task completion progress</span>
+    <strong>{taskProgressPercentage}%</strong>
+  </div>
+
+  <div
+    className="task-progress-track"
+    role="progressbar"
+    aria-label="Task completion progress"
+    aria-valuemin={0}
+    aria-valuemax={100}
+    aria-valuenow={taskProgressPercentage}
+  >
+    <div
+      className="task-progress-fill"
+      style={{ width: `${taskProgressPercentage}%` }}
+    />
+  </div>
+
+  <p>
+    {completedTasks} of {tasks.length} tasks completed
+  </p>
+</div>
+
 
           {/* Search, filters and sorting */}
           <div className="task-filters">
