@@ -351,6 +351,14 @@ function App() {
   const completedTasks = tasks.filter(
     (task) => Boolean(task.completed)
   ).length;
+const pendingTasks = tasks.length - completedTasks;
+
+const overdueTasks = tasks.filter(
+  (task) =>
+    !Boolean(task.completed) &&
+    task.due_date &&
+    task.due_date < new Date().toLocaleDateString('en-CA')
+).length;
 
   return (
     <div className="app">
@@ -456,6 +464,27 @@ function App() {
               {completedTasks}/{tasks.length} completed
             </span>
           </div>
+          <div className="task-stats">
+  <article className="stat-card">
+    <span>Total Tasks</span>
+    <strong>{tasks.length}</strong>
+  </article>
+
+  <article className="stat-card">
+    <span>Completed</span>
+    <strong>{completedTasks}</strong>
+  </article>
+
+  <article className="stat-card">
+    <span>Pending</span>
+    <strong>{pendingTasks}</strong>
+  </article>
+
+  <article className="stat-card">
+    <span>Overdue</span>
+    <strong>{overdueTasks}</strong>
+  </article>
+</div>
 
           {/* Search, filters and sorting */}
           <div className="task-filters">
