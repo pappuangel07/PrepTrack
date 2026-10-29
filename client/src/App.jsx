@@ -200,40 +200,52 @@ function App() {
   }
 
   // Mark a task complete or incomplete
-  async function toggleTask(task) {
-    setUpdatingTaskId(task.id);
-    setTaskError('');
-    setTaskMessage('');
+// Mark a task complete or incomplete
+async function toggleTask(task) {
+  setUpdatingTaskId(task.id);
+  setTaskError('');
+  setTaskMessage('');
 
-    try {
-      const response = await fetch(`/api/tasks/${task.id}`, {
-        method: 'PATCH',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          completed: !Boolean(task.completed),
-        }),
-      });
+  try {
+    const response = await fetch(`/api/tasks/${task.id}`, {
+      method: 'PATCH',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        completed: !Boolean(task.completed),
+      }),
+    });
 
-      const data = await response.json();
+    const data = await response.json();
 
-      if (!response.ok) {
-        throw new Error(data.message || 'Unable to update task.');
-      }
-
-      setTasks((current) =>
-        current.map((item) => (item.id === task.id ? data.task : item))
-      );
-
-      setTaskMessage('Task progress saved!');
-    } catch (err) {
-      setTaskError(err.message || 'Unable to update task.');
-    } finally {
-      setUpdatingTaskId(null);
+    if (!response.ok) {
+      throw new Error(data.message || 'Unable to update task.');
     }
-  }
 
+    if (!data.task) {
+      throw new Error(
+        'Task updated, but the server response is missing task data.'
+      );
+    }
+
+    setTasks((current) =>
+      current.map((item) =>
+        item.id === task.id ? data.task : item
+      )
+    );
+
+    setTaskMessage(
+      Boolean(data.task.completed)
+        ? '🎉 Great job! Task completed!'
+        : 'Task marked as pending.'
+    );
+  } catch (err) {
+    setTaskError(err.message || 'Unable to update task.');
+  } finally {
+    setUpdatingTaskId(null);
+  }
+}
   // Delete a task
   async function deleteTask(id) {
     const confirmed = window.confirm(
