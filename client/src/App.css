@@ -644,3 +644,225 @@ body {
   font-size: 13px;
   margin: 10px 0 0;
 }
+
+
+/* Java Syllabus Tracker */
+
+.java-tracker {
+  margin-top: 32px;
+  padding: 28px;
+  background: #ffffff;
+  border: 1px solid #e5e7eb;
+  border-radius: 18px;
+  box-shadow: 0 8px 24px rgba(15, 23, 42, 0.05);
+  color: #172033;
+}
+
+.java-tracker-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 20px;
+  margin-bottom: 22px;
+}
+
+.java-eyebrow {
+  margin: 0 0 8px;
+  color: #4f46e5;
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 1.2px;
+}
+
+.java-tracker-header h2 {
+  margin: 0 0 8px;
+  font-size: 26px;
+}
+
+.java-tracker-header p {
+  line-height: 1.6;
+}
+
+.java-progress-summary {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 5px;
+  white-space: nowrap;
+}
+
+.java-progress-summary strong {
+  color: #4f46e5;
+  font-size: 30px;
+}
+
+.java-progress-summary span {
+  color: #64748b;
+  font-size: 13px;
+}
+
+.java-progress-track {
+  height: 9px;
+  overflow: hidden;
+  background: #e8eaf0;
+  border-radius: 999px;
+  margin-bottom: 24px;
+}
+
+.java-progress-fill {
+  height: 100%;
+  background: #4f46e5;
+  border-radius: inherit;
+  transition: width 0.25s ease;
+}
+
+.java-filters {
+  display: flex;
+  gap: 12px;
+  margin-bottom: 20px;
+}
+
+.java-filters input,
+.java-filters select,
+.java-status-label select {
+  min-width: 0;
+  padding: 11px 12px;
+  color: #172033;
+  background: #ffffff;
+  border: 1px solid #d7dce5;
+  border-radius: 9px;
+  font: inherit;
+}
+
+.java-filters input {
+  flex: 1;
+}
+
+.java-filters select {
+  max-width: 190px;
+}
+
+.java-topic-list {
+  display: grid;
+  gap: 12px;
+}
+
+.java-topic-card {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 18px;
+  padding: 18px;
+  border: 1px solid #e5e7eb;
+  border-radius: 12px;
+  transition: border-color 0.2s ease;
+}
+
+.java-topic-card:hover {
+  border-color: #a5b4fc;
+}
+
+.java-topic-info {
+  min-width: 0;
+}
+
+.java-topic-category {
+  display: inline-block;
+  margin-bottom: 7px;
+  color: #4f46e5;
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.6px;
+}
+
+.java-topic-info h3 {
+  margin: 0 0 6px;
+  font-size: 16px;
+}
+
+.java-topic-info p {
+  margin: 0;
+  color: #64748b;
+  font-size: 14px;
+  line-height: 1.6;
+}
+
+.java-status-label select {
+  width: 145px;
+  font-size: 13px;
+}
+
+.java-status-label select:disabled {
+  cursor: wait;
+  opacity: 0.65;
+}
+
+.java-error {
+  padding: 12px;
+  color: #b91c1c;
+  background: #fef2f2;
+  border-radius: 8px;
+}
+
+.java-empty {
+  padding: 24px;
+  color: #64748b;
+  text-align: center;
+}
+
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+@media (max-width: 640px) {
+  .java-tracker {
+    padding: 18px;
+  }
+
+  .java-tracker-header {
+    flex-direction: column;
+  }
+
+  .java-progress-summary {
+    align-items: flex-start;
+  }
+
+  .java-filters {
+    flex-direction: column;
+  }
+
+  .java-filters select {
+    max-width: none;
+    width: 100%;
+  }
+
+  .java-topic-card {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .java-status-label select {
+    width: 100%;
+  }
+}
+.clickable-module {
+  cursor: pointer;
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+.clickable-module:hover {
+  transform: translateY(-3px);
+}
+
+.clickable-module h3::after {
+  content: ' →';
+}

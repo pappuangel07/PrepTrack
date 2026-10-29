@@ -1,8 +1,18 @@
 
 import { useEffect, useState } from 'react';
 import './App.css';
+import JavaTracker from './JavaTracker';
+import DSATracker from './DSATracker';
+import AptitudeTracker from './AptitudeTracker';
 
 function App() {
+  const [activePage, setActivePage] = useState('dashboard');
+ const goToDashboard = () => {
+  window.location.reload();
+};
+  const [javaTopics, setJavaTopics] = useState([]);
+  const [dsaTopics, setDsaTopics] = useState([]);
+const [aptitudeTopics, setAptitudeTopics] = useState([]);
   const [roadmap, setRoadmap] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
@@ -52,7 +62,7 @@ function App() {
     const matchesStatus =
       statusFilter === 'All' ||
       (statusFilter === 'Completed' && Boolean(task.completed)) ||
-      (statusFilter === 'Pending' && !Boolean(task.completed));
+      (statusFilter === 'Pending' && !task.completed);
 
     return matchesSearch && matchesPriority && matchesStatus;
   });
@@ -118,9 +128,58 @@ function App() {
         setTasksLoading(false);
       }
     }
+    async function loadJavaTopics() {
+  try {
+    const response = await fetch('/api/java-topics');
+
+    if (!response.ok) {
+      throw new Error('Unable to load Java topics.');
+    }
+
+    const data = await response.json();
+    setJavaTopics(data);
+  } catch (err) {
+    console.error('Unable to load Java topics:', err);
+  }
+}
+
+
+async function loadDsaTopics() {
+  try {
+    const response = await fetch('/api/dsa-topics');
+
+    if (!response.ok) {
+      throw new Error('Could not load DSA topics.');
+    }
+
+    const data = await response.json();
+    setDsaTopics(data);
+  } catch (err) {
+    console.error('Error loading DSA topics:', err);
+  }
+}
+
+async function loadAptitudeTopics() {
+  try {
+    const response = await fetch('/api/aptitude-topics');
+
+    if (!response.ok) {
+      throw new Error('Could not load Aptitude topics.');
+    }
+
+    const data = await response.json();
+    setAptitudeTopics(data);
+  } catch (err) {
+    console.error('Error loading Aptitude topics:', err);
+  }
+}
+
 
     loadRoadmap();
     loadTasks();
+    loadJavaTopics();
+    loadDsaTopics();
+    loadAptitudeTopics();
   }, []);
 
   // Update roadmap progress
@@ -216,7 +275,7 @@ async function toggleTask(task) {
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
-        completed: !Boolean(task.completed),
+        completed: !task.completed,
       }),
     });
 
@@ -239,7 +298,7 @@ async function toggleTask(task) {
     );
 
     setTaskMessage(
-      Boolean(data.task.completed)
+      data.task.completed
         ? '🎉 Great job! Task completed!'
         : 'Task marked as pending.'
     );
@@ -434,28 +493,67 @@ setTaskMessage('Task restored successfully!');
       setSavingEdit(false);
     }
   }
+const completedJavaTopics = javaTopics.filter(
+  (topic) => topic.status === 'Completed'
+).length;
 
-  const completedCount = roadmap.filter(
-    (item) => item.status === 'Completed'
-  ).length;
+const completedDsaTopics = dsaTopics.filter(
+  (topic) => topic.status === 'Completed'
+).length;
 
-  const progressPercentage =
-    roadmap.length === 0
-      ? 0
-      : Math.round((completedCount / roadmap.length) * 100);
+const completedAptitudeTopics = aptitudeTopics.filter(
+  (topic) => topic.status === 'Completed'
+).length;
 
-  const completedTasks = tasks.filter(
-    (task) => Boolean(task.completed)
-  ).length;
+const completedRoadmapModules = roadmap.filter(
+  (item) => item.status === 'Completed'
+).length;
+
+const activeTasks = tasks.filter(
+  (task) => !task.deleted
+);
+
+const completedActiveTasks = activeTasks.filter(
+  (task) => Boolean(task.completed)
+).length;
+
+const completedTasks = tasks.filter(
+  (task) => Boolean(task.completed)
+).length;
+
 const pendingTasks = tasks.length - completedTasks;
+
 const taskProgressPercentage =
   tasks.length === 0
     ? 0
     : Math.round((completedTasks / tasks.length) * 100);
+    
+const completedCount = roadmap.filter(
+  
+  (item) => item.status === 'Completed'
+).length;
 
+const totalProgressItems =
+  javaTopics.length +
+  dsaTopics.length +
+  aptitudeTopics.length +
+  activeTasks.length;
+
+const completedProgressItems =
+  completedJavaTopics +
+  completedDsaTopics +
+  completedAptitudeTopics +
+  completedActiveTasks;
+
+const progressPercentage =
+  totalProgressItems === 0
+    ? 0
+    : Math.round(
+        (completedProgressItems / totalProgressItems) * 100
+      );
 const overdueTasks = tasks.filter(
   (task) =>
-    !Boolean(task.completed) &&
+    !task.completed &&
     task.due_date &&
     task.due_date < new Date().toLocaleDateString('en-CA')
 ).length;
@@ -468,6 +566,44 @@ const overdueTasks = tasks.filter(
       </header>
 
       <main className="main">
+        {activePage === 'java' ? (
+  <>
+    <button
+      type="button"
+      className="secondary-button"
+      onClick={goToDashboard}
+    >
+      ← Back to Dashboard
+    </button>
+
+       <JavaTracker />
+  </>
+) : activePage === 'dsa' ? (
+  <>
+    <button
+      type="button"
+      className="secondary-button"
+      onClick={goToDashboard}
+    >
+      ← Back to Dashboard
+    </button>
+
+    <DSATracker />
+  </>
+) : activePage === 'aptitude' ? (
+  <>
+    <button
+      type="button"
+      className="secondary-button"
+      onClick={goToDashboard}
+    >
+      ← Back to Dashboard
+    </button>
+
+    <AptitudeTracker />
+  </>
+) : (
+  <>
         <section className="welcome">
           <h2>Welcome to PrepTrack 👋</h2>
           <p>
@@ -527,7 +663,30 @@ const overdueTasks = tasks.filter(
 
           {!loading &&
             roadmap.map((item) => (
-              <article className="module-card" key={item.id}>
+              <article
+              className={`module-card ${
+  ['Java', 'Data Structures and Algorithms', 'DSA'].includes(item.title)
+    ? 'clickable-module'
+    : ''
+}`}
+  key={item.id}
+  
+
+onClick={() => {
+  if (item.title === 'Java') {
+    setActivePage('java');
+  } else if (
+    item.title === 'Data Structures and Algorithms' ||
+    item.title === 'DSA'
+  ) {
+    setActivePage('dsa');
+  } else if (item.title === 'Aptitude') {
+    setActivePage('aptitude');
+  }
+}}
+
+
+>
                 <h3>{item.title}</h3>
                 <p>{item.description}</p>
 
@@ -539,6 +698,7 @@ const overdueTasks = tasks.filter(
                   id={`status-${item.id}`}
                   value={item.status}
                   disabled={updatingId === item.id}
+                  onClick={(event) => event.stopPropagation()}
                   onChange={(event) =>
                     updateStatus(item.id, event.target.value)
                   }
@@ -762,7 +922,7 @@ const overdueTasks = tasks.filter(
               {sortedTasks.map((task) => (
                 <article
                   className={`task-card ${
-                    Boolean(task.completed) ? 'task-completed' : ''
+                    task.completed ? 'task-completed' : ''
                   }`}
                   key={task.id}
                 >
@@ -854,18 +1014,18 @@ const overdueTasks = tasks.filter(
                         {task.due_date && (
                           <p
                             className={`task-due-date ${
-                              !Boolean(task.completed) &&
+                              !task.completed &&
                               task.due_date <
                                 new Date().toLocaleDateString('en-CA')
                                 ? 'due-overdue'
-                                : !Boolean(task.completed) &&
+                                : !task.completed &&
                                     task.due_date ===
                                       new Date().toLocaleDateString('en-CA')
                                   ? 'due-today'
                                   : 'due-upcoming'
                             }`}
                           >
-                            {Boolean(task.completed)
+                            {task.completed
                               ? 'Due: '
                               : task.due_date <
                                   new Date().toLocaleDateString('en-CA')
@@ -887,7 +1047,7 @@ const overdueTasks = tasks.filter(
                         </span>
 
                         <span className="task-status">
-                          {Boolean(task.completed)
+                          {task.completed
                             ? 'Completed'
                             : 'In progress'}
                         </span>
@@ -905,7 +1065,7 @@ const overdueTasks = tasks.filter(
                         >
                           {updatingTaskId === task.id
                             ? 'Saving...'
-                            : Boolean(task.completed)
+                            : task.completed
                               ? 'Mark incomplete'
                               : 'Mark complete'}
                         </button>
@@ -943,6 +1103,8 @@ const overdueTasks = tasks.filter(
             </div>
           )}
         </section>
+        </>
+   )}
       </main>
     </div>
   );
