@@ -28,8 +28,27 @@ function App() {
   const [description, setDescription] = useState('');
   const [dueDate, setDueDate] = useState('');
   const [priority, setPriority] = useState('Medium');
+  const [searchTerm, setSearchTerm] = useState('');
+const [priorityFilter, setPriorityFilter] = useState('All');
+const [statusFilter, setStatusFilter] = useState('All');
 
   const priorities = ['High', 'Medium', 'Low'];
+  const filteredTasks = tasks.filter((task) => {
+  const matchesSearch = task.title
+    .toLowerCase()
+    .includes(searchTerm.trim().toLowerCase());
+
+  const matchesPriority =
+    priorityFilter === 'All' ||
+    (task.priority || 'Medium') === priorityFilter;
+
+  const matchesStatus =
+    statusFilter === 'All' ||
+    (statusFilter === 'Completed' && Boolean(task.completed)) ||
+    (statusFilter === 'Pending' && !Boolean(task.completed));
+
+  return matchesSearch && matchesPriority && matchesStatus;
+});
 
   // Load roadmap and tasks from the backend
   useEffect(() => {
@@ -400,7 +419,36 @@ function App() {
               {completedTasks}/{tasks.length} completed
             </span>
           </div>
+          <div className="task-filters">
+  <input
+    type="text"
+    placeholder="Search tasks by title..."
+    value={searchTerm}
+    onChange={(event) => setSearchTerm(event.target.value)}
+    aria-label="Search tasks by title"
+  />
 
+  <select
+    value={priorityFilter}
+    onChange={(event) => setPriorityFilter(event.target.value)}
+    aria-label="Filter tasks by priority"
+  >
+    <option value="All">All priorities</option>
+    <option value="High">High priority</option>
+    <option value="Medium">Medium priority</option>
+    <option value="Low">Low priority</option>
+  </select>
+
+  <select
+    value={statusFilter}
+    onChange={(event) => setStatusFilter(event.target.value)}
+    aria-label="Filter tasks by status"
+  >
+    <option value="All">All statuses</option>
+    <option value="Pending">Pending</option>
+    <option value="Completed">Completed</option>
+  </select>
+</div>
           <form className="task-form" onSubmit={createTask}>
             <h3>Create a new task</h3>
 
@@ -453,6 +501,7 @@ function App() {
           {taskMessage && <p role="status">{taskMessage}</p>}
           {tasksLoading && <p>Loading tasks...</p>}
 
+
           {!tasksLoading && tasks.length === 0 && (
             <div className="empty-tasks">
               <h3>No tasks yet</h3>
@@ -460,9 +509,29 @@ function App() {
             </div>
           )}
 
-          {!tasksLoading && tasks.length > 0 && (
+          {!tasksLoading &&
+            tasks.length > 0 &&
+            filteredTasks.length === 0 && (
+              <div className="empty-tasks">
+                <h3>No matching tasks</h3>
+                <p>Try changing your search or filters.</p>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setSearchTerm('');
+                    setPriorityFilter('All');
+                    setStatusFilter('All');
+                  }}
+                >
+                  Clear filters
+                </button>
+              </div>
+            )}
+
+          {!tasksLoading && filteredTasks.length > 0 && (
             <div className="task-list">
-              {tasks.map((task) => (
+              {filteredTasks.map((task) => (
+
                 <article
                   className={`task-card ${Boolean(task.completed) ? 'task-completed' : ''}`}
                   key={task.id}

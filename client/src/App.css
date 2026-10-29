@@ -190,6 +190,58 @@ body {
   transition: width 0.4s ease;
 }
 
+/* Task search and filters */
+.task-filters {
+  display: grid;
+  grid-template-columns: minmax(0, 2fr) minmax(0, 1fr) minmax(0, 1fr);
+  gap: 12px;
+  margin-bottom: 22px;
+}
+
+.task-filters input,
+.task-filters select {
+  width: 100%;
+  min-width: 0;
+  padding: 12px 14px;
+  border: 1px solid #cbd5e1;
+  border-radius: 10px;
+  background: #ffffff;
+  color: #172033;
+  font: inherit;
+  transition: border-color 0.2s ease, box-shadow 0.2s ease;
+}
+
+.task-filters input::placeholder {
+  color: #94a3b8;
+}
+
+.task-filters input:focus,
+.task-filters select:focus {
+  outline: none;
+  border-color: #6366f1;
+  box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.14);
+}
+
+.task-filters select {
+  cursor: pointer;
+}
+
+.empty-tasks button {
+  margin-top: 16px;
+  padding: 10px 16px;
+  border: none;
+  border-radius: 8px;
+  background: #4f46e5;
+  color: #ffffff;
+  font-weight: bold;
+  cursor: pointer;
+  transition: background 0.2s ease;
+}
+
+.empty-tasks button:hover {
+  background: #3730a3;
+}
+
 /* Tasks section */
 .tasks-section {
   margin-top: 48px;
@@ -466,5 +518,17 @@ body {
 
   .task-actions button {
     flex: 1;
+  }
+}
+
+@media (max-width: 650px) {
+  .task-filters {
+    grid-template-columns: 1fr;
+    gap: 10px;
+  }
+
+  .task-filters input,
+  .task-filters select {
+    font-size: 14px;
   }
 }
