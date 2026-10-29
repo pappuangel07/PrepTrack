@@ -611,11 +611,30 @@ const [statusFilter, setStatusFilter] = useState('All');
 
                         {task.description && <p>{task.description}</p>}
 
-                        {task.due_date && (
-                          <p className="task-due-date">
-                            Due: {task.due_date}
-                          </p>
-                        )}
+                       
+{task.due_date && (
+  <p
+    className={`task-due-date ${
+      !Boolean(task.completed) &&
+      task.due_date < new Date().toLocaleDateString('en-CA')
+        ? 'due-overdue'
+        : !Boolean(task.completed) &&
+            task.due_date === new Date().toLocaleDateString('en-CA')
+          ? 'due-today'
+          : 'due-upcoming'
+    }`}
+  >
+    {Boolean(task.completed)
+      ? 'Due: '
+      : task.due_date < new Date().toLocaleDateString('en-CA')
+        ? 'Overdue: '
+        : task.due_date === new Date().toLocaleDateString('en-CA')
+          ? 'Due today: '
+          : 'Due: '}
+    {task.due_date}
+  </p>
+)}
+
 
                         <span className={`priority-badge priority-${(task.priority || 'Medium').toLowerCase()}`}>
                           {task.priority || 'Medium'} Priority

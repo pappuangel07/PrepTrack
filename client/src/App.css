@@ -388,6 +388,34 @@ body {
   font-size: 13px;
 }
 
+/* Due-date indicators */
+.task-card .due-overdue {
+  color: #dc2626;
+  font-weight: bold;
+  background: #eb9181;
+  padding: 5px 8px;
+  border-radius: 6px;
+}
+
+
+.task-card .due-today {
+  color: #ca8a04;
+  font-weight: bold;
+  background: #f6ae15;
+  padding: 5px 8px;
+  border-radius: 6px;
+}
+
+
+.task-card .due-upcoming {
+  color: #15803d;
+  font-weight: bold;
+  background: #95d7ad;
+  padding: 5px 8px;
+  border-radius: 6px;
+}
+
+
 .task-status {
   display: inline-block;
   margin-top: 4px;
