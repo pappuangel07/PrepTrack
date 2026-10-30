@@ -1076,6 +1076,80 @@ app.post('/api/pomodoro-sessions', (req, res) => {
 });
 
 
+// Get study streak statistics
+app.get('/api/study-streak', (req, res) => {
+  try {
+    const studyDates = db.prepare(`
+      SELECT DISTINCT study_date AS study_date
+      FROM study_sessions
+      WHERE completed = 1
+
+      UNION
+
+      SELECT DISTINCT
+        date(completed_at, '+5 hours', '+30 minutes') AS study_date
+      FROM pomodoro_sessions
+    `).all().map((row) => row.study_date);
+
+    const dates = [...new Set(studyDates)].sort();
+
+    const today = new Intl.DateTimeFormat('en-CA', {
+      timeZone: 'Asia/Kolkata',
+      year: 'numeric',
+      month: '2-digit',
+      day: '2-digit',
+    }).format(new Date());
+
+    const dateSet = new Set(dates);
+
+    let currentStreak = 0;
+    let longestStreak = 0;
+    let streak = 0;
+
+    const checkDate = (dateString) => {
+      const date = new Date(`${dateString}T00:00:00Z`);
+      date.setUTCDate(date.getUTCDate() - 1);
+      return date.toISOString().slice(0, 10);
+    };
+
+    let previousDate = null;
+
+    dates.forEach((date) => {
+      if (previousDate && checkDate(date) === previousDate) {
+        streak++;
+      } else {
+        streak = 1;
+      }
+
+      longestStreak = Math.max(longestStreak, streak);
+      previousDate = date;
+    });
+
+    const yesterday = checkDate(today);
+    let currentDate = dateSet.has(today) ? today : yesterday;
+
+    while (dateSet.has(currentDate)) {
+      currentStreak++;
+      currentDate = checkDate(currentDate);
+    }
+
+    res.json({
+      currentStreak,
+      longestStreak,
+      totalStudyDays: dates.length,
+      studiedToday: dateSet.has(today),
+      studyDates: dates,
+    });
+  } catch (error) {
+    console.error('Study streak error:', error);
+
+    res.status(500).json({
+      message: 'Failed to calculate study streak',
+    });
+  }
+});
+
+
 // Start the backend server
 app.listen(PORT, () => {
   console.log(

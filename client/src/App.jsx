@@ -6,6 +6,7 @@ import DSATracker from './DSATracker';
 import AptitudeTracker from './AptitudeTracker';
 import StudyPlanner from './StudyPlanner';
 import PomodoroTimer from './PomodoroTimer';
+import StudyStreak from './StudyStreak';
 
 function App() {
   const [activePage, setActivePage] = useState('dashboard');
@@ -596,6 +597,19 @@ const overdueTasks = tasks.filter(
   <StudyPlanner goToDashboard={goToDashboard} />
 ) : activePage === 'pomodoro' ? (
   <PomodoroTimer goToDashboard={goToDashboard} />
+) : activePage === 'streak' ? (
+  <>
+    <button
+      type="button"
+      className="secondary-button"
+      onClick={goToDashboard}
+    >
+      ← Back to Dashboard
+    </button>
+
+    <StudyStreak />
+  </>
+  
 ) : activePage === 'aptitude' ? (
 
   <>
@@ -640,6 +654,13 @@ const overdueTasks = tasks.filter(
   onClick={() => setActivePage('pomodoro')}
 >
   Open Pomodoro Timer
+</button>
+<button
+  type="button"
+  className="secondary-button"
+  onClick={() => setActivePage('streak')}
+>
+  Open Study Streak Tracker
 </button>
 </div>
         </section>
