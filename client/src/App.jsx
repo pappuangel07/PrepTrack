@@ -4,6 +4,7 @@ import './App.css';
 import JavaTracker from './JavaTracker';
 import DSATracker from './DSATracker';
 import AptitudeTracker from './AptitudeTracker';
+import StudyPlanner from './StudyPlanner';
 
 function App() {
   const [activePage, setActivePage] = useState('dashboard');
@@ -590,6 +591,8 @@ const overdueTasks = tasks.filter(
 
     <DSATracker />
   </>
+  ) : activePage === 'planner' ? (
+  <StudyPlanner goToDashboard={goToDashboard} />
 ) : activePage === 'aptitude' ? (
   <>
     <button
@@ -611,14 +614,23 @@ const overdueTasks = tasks.filter(
             and track your placement progress.
           </p>
 
-          <div className="welcome-actions">
-            <a className="primary-button" href="#roadmap">
-              Explore your roadmap
-            </a>
-            <a className="secondary-button" href="#tasks">
-              Manage your tasks
-            </a>
-          </div>
+<div className="welcome-actions">
+  <a className="primary-button" href="#roadmap">
+    Explore your roadmap
+  </a>
+
+  <a className="secondary-button" href="#tasks">
+    Manage your tasks
+  </a>
+
+  <button
+    type="button"
+    className="secondary-button"
+    onClick={() => setActivePage('planner')}
+  >
+    Open Study Planner
+  </button>
+</div>
         </section>
 
         <section className="modules" id="roadmap">

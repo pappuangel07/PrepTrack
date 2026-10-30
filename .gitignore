@@ -21,3 +21,4 @@ node_modules/
 /frontend-review.txt
 /server/preptrack-backup.db
 /server/preptrack-before-java.db
+/server/preptrack-before-planner.db

@@ -87,6 +87,23 @@ if (!hasDeleted) {
   `);
 }
 
+// Create the study sessions table
+db.exec(`
+  CREATE TABLE IF NOT EXISTS study_sessions (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    subject TEXT NOT NULL
+      CHECK (subject IN ('Java', 'DSA', 'Aptitude')),
+    topic TEXT NOT NULL,
+    study_date TEXT NOT NULL,
+    start_time TEXT NOT NULL,
+    duration_minutes INTEGER NOT NULL
+      CHECK (duration_minutes > 0),
+    completed INTEGER NOT NULL DEFAULT 0
+      CHECK (completed IN (0, 1)),
+    created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+  )
+`);
+
  // Create the Java topics table
 db.exec(`
   CREATE TABLE IF NOT EXISTS java_topics (
@@ -762,6 +779,235 @@ app.patch('/api/tasks/:id/restore', (req, res) => {
   res.json({
     message: 'Task restored successfully',
     task
+  });
+});
+
+// ======================================
+// STUDY PLANNER API
+// ======================================
+
+const allowedSubjects = ['Java', 'DSA', 'Aptitude'];
+
+// Get all study sessions
+app.get('/api/study-sessions', (req, res) => {
+  const sessions = db.prepare(`
+    SELECT *
+    FROM study_sessions
+    ORDER BY study_date, start_time
+  `).all();
+
+  res.json(sessions);
+});
+
+// Create a study session
+app.post('/api/study-sessions', (req, res) => {
+  const {
+    subject,
+    topic,
+    study_date,
+    start_time,
+    duration_minutes
+  } = req.body;
+
+  if (!allowedSubjects.includes(subject)) {
+    return res.status(400).json({
+      message: 'Invalid subject'
+    });
+  }
+
+  if (typeof topic !== 'string' || !topic.trim()) {
+    return res.status(400).json({
+      message: 'Topic is required'
+    });
+  }
+
+  if (
+    typeof study_date !== 'string' ||
+    !/^\d{4}-\d{2}-\d{2}$/.test(study_date) ||
+    !Number.isFinite(Date.parse(study_date)) ||
+    new Date(study_date).toISOString().slice(0, 10) !== study_date
+  ) {
+    return res.status(400).json({
+      message: 'Invalid study date. Use YYYY-MM-DD'
+    });
+  }
+
+  if (
+    typeof start_time !== 'string' ||
+    !/^([01]\d|2[0-3]):[0-5]\d$/.test(start_time)
+  ) {
+    return res.status(400).json({
+      message: 'Invalid start time. Use HH:MM'
+    });
+  }
+
+  if (
+    !Number.isInteger(duration_minutes) ||
+    duration_minutes < 1 ||
+    duration_minutes > 1440
+  ) {
+    return res.status(400).json({
+      message: 'Duration must be between 1 and 1440 minutes'
+    });
+  }
+
+  const result = db.prepare(`
+    INSERT INTO study_sessions
+      (subject, topic, study_date, start_time, duration_minutes)
+    VALUES (?, ?, ?, ?, ?)
+  `).run(
+    subject,
+    topic.trim(),
+    study_date,
+    start_time,
+    duration_minutes
+  );
+
+  const newSession = db.prepare(`
+    SELECT * FROM study_sessions WHERE id = ?
+  `).get(result.lastInsertRowid);
+
+  res.status(201).json({
+    message: 'Study session created successfully',
+    session: newSession
+  });
+});
+
+// Update a study session
+app.patch('/api/study-sessions/:id', (req, res) => {
+  const id = Number(req.params.id);
+
+  if (!Number.isInteger(id) || id < 1) {
+    return res.status(400).json({
+      message: 'Invalid session ID'
+    });
+  }
+
+  const session = db.prepare(
+    'SELECT * FROM study_sessions WHERE id = ?'
+  ).get(id);
+
+  if (!session) {
+    return res.status(404).json({
+      message: 'Study session not found'
+    });
+  }
+
+  const {
+    subject,
+    topic,
+    study_date,
+    start_time,
+    duration_minutes,
+    completed
+  } = req.body;
+
+  const newSubject = subject ?? session.subject;
+  const newTopic = topic ?? session.topic;
+  const newDate = study_date ?? session.study_date;
+  const newTime = start_time ?? session.start_time;
+  const newDuration = duration_minutes ?? session.duration_minutes;
+  const newCompleted = completed ?? Boolean(session.completed);
+
+  if (!allowedSubjects.includes(newSubject)) {
+    return res.status(400).json({
+      message: 'Invalid subject'
+    });
+  }
+
+  if (typeof newTopic !== 'string' || !newTopic.trim()) {
+    return res.status(400).json({
+      message: 'Topic is required'
+    });
+  }
+
+  if (
+    typeof newDate !== 'string' ||
+    !/^\d{4}-\d{2}-\d{2}$/.test(newDate) ||
+    !Number.isFinite(Date.parse(newDate)) ||
+    new Date(newDate).toISOString().slice(0, 10) !== newDate
+  ) {
+    return res.status(400).json({
+      message: 'Invalid study date'
+    });
+  }
+
+  if (
+    typeof newTime !== 'string' ||
+    !/^([01]\d|2[0-3]):[0-5]\d$/.test(newTime)
+  ) {
+    return res.status(400).json({
+      message: 'Invalid start time'
+    });
+  }
+
+  if (
+    !Number.isInteger(newDuration) ||
+    newDuration < 1 ||
+    newDuration > 1440
+  ) {
+    return res.status(400).json({
+      message: 'Invalid duration'
+    });
+  }
+
+  if (typeof newCompleted !== 'boolean') {
+    return res.status(400).json({
+      message: 'Completed must be true or false'
+    });
+  }
+
+  db.prepare(`
+    UPDATE study_sessions
+    SET subject = ?,
+        topic = ?,
+        study_date = ?,
+        start_time = ?,
+        duration_minutes = ?,
+        completed = ?
+    WHERE id = ?
+  `).run(
+    newSubject,
+    newTopic.trim(),
+    newDate,
+    newTime,
+    newDuration,
+    newCompleted ? 1 : 0,
+    id
+  );
+
+  const updatedSession = db.prepare(
+    'SELECT * FROM study_sessions WHERE id = ?'
+  ).get(id);
+
+  res.json({
+    message: 'Study session updated successfully',
+    session: updatedSession
+  });
+});
+
+// Delete a study session
+app.delete('/api/study-sessions/:id', (req, res) => {
+  const id = Number(req.params.id);
+
+  if (!Number.isInteger(id) || id < 1) {
+    return res.status(400).json({
+      message: 'Invalid session ID'
+    });
+  }
+
+  const result = db.prepare(
+    'DELETE FROM study_sessions WHERE id = ?'
+  ).run(id);
+
+  if (result.changes === 0) {
+    return res.status(404).json({
+      message: 'Study session not found'
+    });
+  }
+
+  res.json({
+    message: 'Study session deleted successfully'
   });
 });
 
