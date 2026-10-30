@@ -15,3 +15,9 @@ server/preptrack.db
 server/preptrack.db-shm
 server/preptrack.db-wal
 node_modules/
+
+# Local review files and database backups
+/backend-review.txt
+/frontend-review.txt
+/server/preptrack-backup.db
+/server/preptrack-before-java.db
