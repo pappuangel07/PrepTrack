@@ -104,6 +104,21 @@ db.exec(`
   )
 `);
 
+
+ // Create the Pomodoro focus sessions table
+db.exec(`
+  CREATE TABLE IF NOT EXISTS pomodoro_sessions (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    subject TEXT NOT NULL
+      CHECK (subject IN ('Java', 'DSA', 'Aptitude')),
+    duration_minutes INTEGER NOT NULL
+      CHECK (duration_minutes > 0),
+    completed_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+  )
+`);
+
+
  // Create the Java topics table
 db.exec(`
   CREATE TABLE IF NOT EXISTS java_topics (
@@ -1010,6 +1025,56 @@ app.delete('/api/study-sessions/:id', (req, res) => {
     message: 'Study session deleted successfully'
   });
 });
+
+
+ // Get all completed Pomodoro sessions
+app.get('/api/pomodoro-sessions', (req, res) => {
+  const sessions = db.prepare(`
+    SELECT *
+    FROM pomodoro_sessions
+    ORDER BY completed_at DESC, id DESC
+  `).all();
+
+  res.json(sessions);
+});
+
+// Save a completed Pomodoro focus session
+app.post('/api/pomodoro-sessions', (req, res) => {
+  const { subject, duration_minutes } = req.body;
+
+  if (!['Java', 'DSA', 'Aptitude'].includes(subject)) {
+    return res.status(400).json({
+      message: 'Invalid subject'
+    });
+  }
+
+  if (
+    !Number.isInteger(duration_minutes) ||
+    duration_minutes < 1 ||
+    duration_minutes > 25
+  ) {
+    return res.status(400).json({
+      message: 'Duration must be between 1 and 25 minutes'
+    });
+  }
+
+  const result = db.prepare(`
+    INSERT INTO pomodoro_sessions (subject, duration_minutes)
+    VALUES (?, ?)
+  `).run(subject, duration_minutes);
+
+  const session = db.prepare(`
+    SELECT *
+    FROM pomodoro_sessions
+    WHERE id = ?
+  `).get(result.lastInsertRowid);
+
+  res.status(201).json({
+    message: 'Pomodoro session saved successfully',
+    session
+  });
+});
+
 
 // Start the backend server
 app.listen(PORT, () => {

@@ -5,6 +5,7 @@ import JavaTracker from './JavaTracker';
 import DSATracker from './DSATracker';
 import AptitudeTracker from './AptitudeTracker';
 import StudyPlanner from './StudyPlanner';
+import PomodoroTimer from './PomodoroTimer';
 
 function App() {
   const [activePage, setActivePage] = useState('dashboard');
@@ -591,9 +592,12 @@ const overdueTasks = tasks.filter(
 
     <DSATracker />
   </>
-  ) : activePage === 'planner' ? (
+) : activePage === 'planner' ? (
   <StudyPlanner goToDashboard={goToDashboard} />
+) : activePage === 'pomodoro' ? (
+  <PomodoroTimer goToDashboard={goToDashboard} />
 ) : activePage === 'aptitude' ? (
+
   <>
     <button
       type="button"
@@ -630,6 +634,13 @@ const overdueTasks = tasks.filter(
   >
     Open Study Planner
   </button>
+  <button
+  type="button"
+  className="secondary-button"
+  onClick={() => setActivePage('pomodoro')}
+>
+  Open Pomodoro Timer
+</button>
 </div>
         </section>
 
