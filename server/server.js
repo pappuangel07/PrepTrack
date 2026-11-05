@@ -168,6 +168,20 @@ db.exec(`
   )
 `);
 
+// Create the bookmarks table
+db.exec(`
+  CREATE TABLE IF NOT EXISTS bookmarks (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    title TEXT NOT NULL,
+    url TEXT NOT NULL,
+    subject TEXT NOT NULL
+      CHECK (subject IN ('Java', 'DSA', 'Aptitude')),
+    description TEXT NOT NULL DEFAULT '',
+    created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+  )
+`);
+
 const aptitudeTopics = [
   ['Number System', 'Quantitative Aptitude', 'Natural numbers, integers, divisibility, factors and multiples.', 1],
   ['HCF and LCM', 'Quantitative Aptitude', 'Find HCF and LCM and solve related problems.', 2],
@@ -1048,6 +1062,204 @@ app.get('/api/pomodoro-sessions', (req, res) => {
   `).all();
 
   res.json(sessions);
+});
+
+// Get all bookmarks
+app.get('/api/bookmarks', (req, res) => {
+  try {
+    const bookmarks = db.prepare(`
+      SELECT *
+      FROM bookmarks
+      ORDER BY updated_at DESC, id DESC
+    `).all();
+
+    res.json(bookmarks);
+  } catch (error) {
+    console.error('Get bookmarks error:', error);
+
+    res.status(500).json({
+      message: 'Failed to fetch bookmarks',
+    });
+  }
+});
+
+// Create a new bookmark
+app.post('/api/bookmarks', (req, res) => {
+  try {
+    const { title, url, subject, description } = req.body;
+
+    if (!title || !title.trim()) {
+      return res.status(400).json({
+        message: 'Bookmark title is required',
+      });
+    }
+
+    if (!url || !url.trim()) {
+      return res.status(400).json({
+        message: 'Bookmark URL is required',
+      });
+    }
+
+    let parsedUrl;
+
+    try {
+      parsedUrl = new URL(url.trim());
+    } catch {
+      return res.status(400).json({
+        message: 'Invalid bookmark URL',
+      });
+    }
+
+    if (!['http:', 'https:'].includes(parsedUrl.protocol)) {
+      return res.status(400).json({
+        message: 'Only HTTP and HTTPS URLs are allowed',
+      });
+    }
+
+    if (!allowedSubjects.includes(subject)) {
+      return res.status(400).json({
+        message: 'Invalid subject',
+      });
+    }
+
+    const result = db.prepare(`
+      INSERT INTO bookmarks (title, url, subject, description)
+      VALUES (?, ?, ?, ?)
+    `).run(
+      title.trim(),
+      parsedUrl.href,
+      subject,
+      description || ''
+    );
+
+    const bookmark = db.prepare(`
+      SELECT * FROM bookmarks WHERE id = ?
+    `).get(result.lastInsertRowid);
+
+    res.status(201).json(bookmark);
+  } catch (error) {
+    console.error('Create bookmark error:', error);
+
+    res.status(500).json({
+      message: 'Failed to create bookmark',
+    });
+  }
+});
+
+// Update an existing bookmark
+app.put('/api/bookmarks/:id', (req, res) => {
+  try {
+    const { title, url, subject, description } = req.body;
+    const bookmarkId = Number(req.params.id);
+
+    if (!Number.isInteger(bookmarkId) || bookmarkId <= 0) {
+      return res.status(400).json({
+        message: 'Invalid bookmark ID',
+      });
+    }
+
+    if (!title || !title.trim()) {
+      return res.status(400).json({
+        message: 'Bookmark title is required',
+      });
+    }
+
+    if (!url || !url.trim()) {
+      return res.status(400).json({
+        message: 'Bookmark URL is required',
+      });
+    }
+
+    let parsedUrl;
+
+    try {
+      parsedUrl = new URL(url.trim());
+    } catch {
+      return res.status(400).json({
+        message: 'Invalid bookmark URL',
+      });
+    }
+
+    if (!['http:', 'https:'].includes(parsedUrl.protocol)) {
+      return res.status(400).json({
+        message: 'Only HTTP and HTTPS URLs are allowed',
+      });
+    }
+
+    if (!allowedSubjects.includes(subject)) {
+      return res.status(400).json({
+        message: 'Invalid subject',
+      });
+    }
+
+    const result = db.prepare(`
+      UPDATE bookmarks
+      SET title = ?,
+          url = ?,
+          subject = ?,
+          description = ?,
+          updated_at = CURRENT_TIMESTAMP
+      WHERE id = ?
+    `).run(
+      title.trim(),
+      parsedUrl.href,
+      subject,
+      description || '',
+      bookmarkId
+    );
+
+    if (result.changes === 0) {
+      return res.status(404).json({
+        message: 'Bookmark not found',
+      });
+    }
+
+    const updatedBookmark = db.prepare(`
+      SELECT * FROM bookmarks WHERE id = ?
+    `).get(bookmarkId);
+
+    res.json(updatedBookmark);
+  } catch (error) {
+    console.error('Update bookmark error:', error);
+
+    res.status(500).json({
+      message: 'Failed to update bookmark',
+    });
+  }
+});
+
+// Delete a bookmark
+app.delete('/api/bookmarks/:id', (req, res) => {
+  try {
+    const bookmarkId = Number(req.params.id);
+
+    if (!Number.isInteger(bookmarkId) || bookmarkId <= 0) {
+      return res.status(400).json({
+        message: 'Invalid bookmark ID',
+      });
+    }
+
+    const result = db.prepare(`
+      DELETE FROM bookmarks
+      WHERE id = ?
+    `).run(bookmarkId);
+
+    if (result.changes === 0) {
+      return res.status(404).json({
+        message: 'Bookmark not found',
+      });
+    }
+
+    res.json({
+      message: 'Bookmark deleted successfully',
+    });
+  } catch (error) {
+    console.error('Delete bookmark error:', error);
+
+    res.status(500).json({
+      message: 'Failed to delete bookmark',
+    });
+  }
 });
 
 // Get all notes

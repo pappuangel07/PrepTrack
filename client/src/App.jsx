@@ -8,6 +8,7 @@ import StudyPlanner from './StudyPlanner';
 import PomodoroTimer from './PomodoroTimer';
 import StudyStreak from './StudyStreak';
 import NotesManager from './NotesManager';
+import BookmarksManager from './BookmarksManager';
 
 function App() {
   const [activePage, setActivePage] = useState('dashboard');
@@ -614,6 +615,9 @@ const overdueTasks = tasks.filter(
 ) : activePage === 'notes' ? (
   <NotesManager goToDashboard={goToDashboard} />
 
+  ) : activePage === 'bookmarks' ? (
+  <BookmarksManager goToDashboard={goToDashboard} />
+
 ) : activePage === 'aptitude' ? (
 
   <>
@@ -673,6 +677,14 @@ const overdueTasks = tasks.filter(
   onClick={() => setActivePage('notes')}
 >
   Open Notes Manager
+</button>
+
+<button
+  type="button"
+  className="secondary-button"
+  onClick={() => setActivePage('bookmarks')}
+>
+  Open Bookmarks Manager
 </button>
 
 </div>
