@@ -7,6 +7,7 @@ import AptitudeTracker from './AptitudeTracker';
 import StudyPlanner from './StudyPlanner';
 import PomodoroTimer from './PomodoroTimer';
 import StudyStreak from './StudyStreak';
+import NotesManager from './NotesManager';
 
 function App() {
   const [activePage, setActivePage] = useState('dashboard');
@@ -610,6 +611,9 @@ const overdueTasks = tasks.filter(
     <StudyStreak />
   </>
   
+) : activePage === 'notes' ? (
+  <NotesManager goToDashboard={goToDashboard} />
+
 ) : activePage === 'aptitude' ? (
 
   <>
@@ -662,6 +666,15 @@ const overdueTasks = tasks.filter(
 >
   Open Study Streak Tracker
 </button>
+
+<button
+  type="button"
+  className="secondary-button"
+  onClick={() => setActivePage('notes')}
+>
+  Open Notes Manager
+</button>
+
 </div>
         </section>
 

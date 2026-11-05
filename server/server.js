@@ -155,6 +155,18 @@ db.exec(`
   )
 `);
 
+// Create the notes table
+db.exec(`
+  CREATE TABLE IF NOT EXISTS notes (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    title TEXT NOT NULL,
+    subject TEXT NOT NULL
+      CHECK (subject IN ('Java', 'DSA', 'Aptitude')),
+    content TEXT NOT NULL DEFAULT '',
+    created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+  )
+`);
 
 const aptitudeTopics = [
   ['Number System', 'Quantitative Aptitude', 'Natural numbers, integers, divisibility, factors and multiples.', 1],
@@ -1036,6 +1048,148 @@ app.get('/api/pomodoro-sessions', (req, res) => {
   `).all();
 
   res.json(sessions);
+});
+
+// Get all notes
+app.get('/api/notes', (req, res) => {
+  try {
+    const notes = db.prepare(`
+      SELECT *
+      FROM notes
+      ORDER BY updated_at DESC, id DESC
+    `).all();
+
+    res.json(notes);
+  } catch (error) {
+    console.error('Get notes error:', error);
+
+    res.status(500).json({
+      message: 'Failed to fetch notes',
+    });
+  }
+});
+
+// Create a new note
+app.post('/api/notes', (req, res) => {
+  try {
+    const { title, subject, content } = req.body;
+
+    if (!title || !title.trim()) {
+      return res.status(400).json({
+        message: 'Note title is required',
+      });
+    }
+
+    if (!allowedSubjects.includes(subject)) {
+      return res.status(400).json({
+        message: 'Invalid subject',
+      });
+    }
+
+    const result = db.prepare(`
+      INSERT INTO notes (title, subject, content)
+      VALUES (?, ?, ?)
+    `).run(title.trim(), subject, content || '');
+
+    const note = db.prepare(`
+      SELECT * FROM notes WHERE id = ?
+    `).get(result.lastInsertRowid);
+
+    res.status(201).json(note);
+  } catch (error) {
+    console.error('Create note error:', error);
+
+    res.status(500).json({
+      message: 'Failed to create note',
+    });
+  }
+});
+
+// Update an existing note
+app.put('/api/notes/:id', (req, res) => {
+  try {
+    const { title, subject, content } = req.body;
+    const noteId = Number(req.params.id);
+
+    if (!Number.isInteger(noteId) || noteId <= 0) {
+      return res.status(400).json({
+        message: 'Invalid note ID',
+      });
+    }
+
+    if (!title || !title.trim()) {
+      return res.status(400).json({
+        message: 'Note title is required',
+      });
+    }
+
+    if (!allowedSubjects.includes(subject)) {
+      return res.status(400).json({
+        message: 'Invalid subject',
+      });
+    }
+
+    const result = db.prepare(`
+      UPDATE notes
+      SET title = ?,
+          subject = ?,
+          content = ?,
+          updated_at = CURRENT_TIMESTAMP
+      WHERE id = ?
+    `).run(title.trim(), subject, content || '', noteId);
+
+    if (result.changes === 0) {
+      return res.status(404).json({
+        message: 'Note not found',
+      });
+    }
+
+    const updatedNote = db.prepare(`
+      SELECT * FROM notes WHERE id = ?
+    `).get(noteId);
+
+    res.json(updatedNote);
+  } catch (error) {
+    console.error('Update note error:', error);
+
+    res.status(500).json({
+      message: 'Failed to update note',
+    });
+  }
+});
+
+// Delete a note
+app.delete('/api/notes/:id', (req, res) => {
+  try {
+    const noteId = Number(req.params.id);
+
+    if (!Number.isInteger(noteId) || noteId <= 0) {
+      return res.status(400).json({
+        message: 'Invalid note ID',
+      });
+    }
+
+    const result = db.prepare(`
+      DELETE FROM notes
+      WHERE id = ?
+    `).run(noteId);
+
+    if (result.changes === 0) {
+      return res.status(404).json({
+        message: 'Note not found',
+      });
+    }
+
+    res.json({
+      message: 'Note deleted successfully',
+    });
+  } catch (error) {
+    console.error('Delete note error:', error);
+
+    res.status(500).json({
+      message: 'Failed to delete note',
+    });
+  }
 });
 
 // Save a completed Pomodoro focus session
