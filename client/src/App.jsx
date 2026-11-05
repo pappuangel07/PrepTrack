@@ -510,9 +510,6 @@ const completedAptitudeTopics = aptitudeTopics.filter(
   (topic) => topic.status === 'Completed'
 ).length;
 
-const completedRoadmapModules = roadmap.filter(
-  (item) => item.status === 'Completed'
-).length;
 
 const activeTasks = tasks.filter(
   (task) => !task.deleted

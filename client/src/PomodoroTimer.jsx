@@ -1,6 +1,5 @@
 
-import { useEffect, useState } from 'react';
-
+import { useEffect, useRef, useState } from 'react';
 const FOCUS_SECONDS = 25 * 60;
 const BREAK_SECONDS = 5 * 60;
 
@@ -12,21 +11,66 @@ function PomodoroTimer({ goToDashboard }) {
   const [message, setMessage] = useState('');
 const [sessions, setSessions] = useState([]);
 
+
+const completionHandled = useRef(false);
+
 useEffect(() => {
   if (!isRunning) return;
 
   const timerId = window.setInterval(() => {
-    setSecondsLeft((previous) => {
-      if (previous > 1) {
-        return previous - 1;
-      }
+    if (secondsLeft > 1) {
+      setSecondsLeft(secondsLeft - 1);
+      return;
+    }
 
-      return 0;
-    });
+    window.clearInterval(timerId);
+    setSecondsLeft(0);
+    setIsRunning(false);
+
+    if (completionHandled.current) return;
+    completionHandled.current = true;
+
+    if (mode === 'focus') {
+      fetch('/api/pomodoro-sessions', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          subject,
+          duration_minutes: 25,
+        }),
+      })
+        .then((response) => {
+          if (!response.ok) {
+            throw new Error('Failed to save Pomodoro session');
+          }
+          return response.json();
+        })
+        .then((savedSession) => {
+          setSessions((previousSessions) => [
+            savedSession,
+            ...previousSessions,
+          ]);
+          setMessage('Focus session completed and saved successfully!');
+        })
+        .catch((error) => {
+          console.error('Pomodoro save error:', error);
+          setMessage('Session completed, but saving failed.');
+        });
+
+      if ('Notification' in window && Notification.permission === 'granted') {
+        new Notification('PrepTrack', {
+          body: `${subject} focus session completed!`,
+        });
+      }
+    } else {
+      setMessage('Break complete! Ready to focus again?');
+    }
   }, 1000);
 
   return () => window.clearInterval(timerId);
-}, [isRunning]);
+}, [isRunning, secondsLeft, mode, subject]);
 
 
 useEffect(() => {
@@ -47,51 +91,6 @@ useEffect(() => {
 
   fetchSessions();
 }, []);
-
-
-const savePomodoroSession = async () => {
-  try {
-    const response = await fetch('/api/pomodoro-sessions', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        subject,
-        duration_minutes: Math.ceil(FOCUS_SECONDS / 60),
-      }),
-    });
-
-    if (!response.ok) {
-      throw new Error('Failed to save Pomodoro session');
-    }
-
-    setMessage('Focus session completed and saved successfully!');
-  } catch (error) {
-    console.error('Pomodoro save error:', error);
-    setMessage('Session completed, but saving failed.');
-  }
-};
-
-
-useEffect(() => {
-  if (!isRunning || secondsLeft !== 0) return;
-
-  setIsRunning(false);
-
-  if (mode === 'focus') {
-    savePomodoroSession();
-
-    if ('Notification' in window && Notification.permission === 'granted') {
-      new Notification('PrepTrack', {
-        body: `${subject} focus session completed!`,
-      });
-    }
-  } else {
-    setMessage('Break complete! Ready to focus again?');
-  }
-}, [secondsLeft, isRunning, mode, subject]);
-
 
 const totalSessions = sessions.length;
 
@@ -115,6 +114,7 @@ const subjectStats = {
   };
 
   const changeMode = (newMode) => {
+    completionHandled.current = false;
     setIsRunning(false);
     setMode(newMode);
     setSecondsLeft(newMode === 'focus' ? FOCUS_SECONDS : BREAK_SECONDS);
@@ -122,6 +122,7 @@ const subjectStats = {
   };
 
   const resetTimer = () => {
+    completionHandled.current = false;
     setIsRunning(false);
     setSecondsLeft(mode === 'focus' ? FOCUS_SECONDS : BREAK_SECONDS);
     setMessage('');

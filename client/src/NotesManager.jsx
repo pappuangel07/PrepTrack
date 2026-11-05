@@ -18,8 +18,8 @@ function NotesManager({ goToDashboard }) {
 
   async function loadNotes() {
     try {
-      setLoading(true);
-      setError('');
+    setLoading(true);
+    setError('');
 
       const response = await fetch('/api/notes');
 
@@ -36,9 +36,41 @@ function NotesManager({ goToDashboard }) {
     }
   }
 
-  useEffect(() => {
-    loadNotes();
-  }, []);
+
+useEffect(() => {
+  let isActive = true;
+
+  async function fetchNotes() {
+    try {
+      const response = await fetch('/api/notes');
+
+      if (!response.ok) {
+        throw new Error('Unable to load notes.');
+      }
+
+      const data = await response.json();
+
+      if (isActive) {
+        setNotes(data);
+      }
+    } catch (err) {
+      if (isActive) {
+        setError(err.message || 'Something went wrong.');
+      }
+    } finally {
+      if (isActive) {
+        setLoading(false);
+      }
+    }
+  }
+
+  fetchNotes();
+
+  return () => {
+    isActive = false;
+  };
+}, []);
+
 
   const filteredNotes = useMemo(() => {
     return notes.filter((note) => {

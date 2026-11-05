@@ -27,11 +27,12 @@ function StudyPlanner({ goToDashboard }) {
   );
 
   // Load study sessions
-  async function loadSessions() {
-    try {
-      setLoading(true);
-      setError('');
 
+useEffect(() => {
+  let isActive = true;
+
+  async function fetchSessions() {
+    try {
       const response = await fetch('/api/study-sessions');
 
       if (!response.ok) {
@@ -39,17 +40,27 @@ function StudyPlanner({ goToDashboard }) {
       }
 
       const data = await response.json();
-      setSessions(data);
+
+      if (isActive) {
+        setSessions(data);
+      }
     } catch (err) {
-      setError(err.message || 'Something went wrong.');
+      if (isActive) {
+        setError(err.message || 'Something went wrong.');
+      }
     } finally {
-      setLoading(false);
+      if (isActive) {
+        setLoading(false);
+      }
     }
   }
 
-  useEffect(() => {
-    loadSessions();
-  }, []);
+  fetchSessions();
+
+  return () => {
+    isActive = false;
+  };
+}, []);
 
   // Filter sessions by selected date
   const dailySessions = useMemo(() => {
@@ -64,7 +75,7 @@ function StudyPlanner({ goToDashboard }) {
   );
 
   const completedMinutes = dailySessions
-    .filter((session) => Boolean(session.completed))
+    .filter((session) => session.completed)
     .reduce(
       (total, session) => total + session.duration_minutes,
       0
@@ -84,7 +95,7 @@ async function toggleSession(session) {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          completed: !Boolean(session.completed),
+          completed: !session.completed,
         }),
       }
     );

@@ -17,11 +17,12 @@ function BookmarksManager({ goToDashboard }) {
   const [searchTerm, setSearchTerm] = useState('');
   const [filterSubject, setFilterSubject] = useState('All');
 
-  async function loadBookmarks() {
-    try {
-      setLoading(true);
-      setError('');
 
+useEffect(() => {
+  let isActive = true;
+
+  async function fetchBookmarks() {
+    try {
       const response = await fetch('/api/bookmarks');
 
       if (!response.ok) {
@@ -29,17 +30,48 @@ function BookmarksManager({ goToDashboard }) {
       }
 
       const data = await response.json();
-      setBookmarks(data);
+
+      if (isActive) {
+        setBookmarks(data);
+      }
     } catch (err) {
-      setError(err.message || 'Something went wrong.');
+      if (isActive) {
+        setError(err.message || 'Something went wrong.');
+      }
     } finally {
-      setLoading(false);
+      if (isActive) {
+        setLoading(false);
+      }
     }
   }
 
-  useEffect(() => {
-    loadBookmarks();
-  }, []);
+  fetchBookmarks();
+
+  return () => {
+    isActive = false;
+  };
+}, []);
+
+
+async function loadBookmarks() {
+  try {
+    setLoading(true);
+    setError('');
+    const response = await fetch('/api/bookmarks');
+
+    if (!response.ok) {
+      throw new Error('Unable to load bookmarks.');
+    }
+
+    const data = await response.json();
+    setBookmarks(data);
+  } catch (err) {
+    setError(err.message || 'Something went wrong.');
+  } finally {
+    setLoading(false);
+  }
+}
+
 
   const filteredBookmarks = useMemo(() => {
     return bookmarks.filter((bookmark) => {
