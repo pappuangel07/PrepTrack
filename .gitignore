@@ -22,3 +22,7 @@ node_modules/
 /server/preptrack-backup.db
 /server/preptrack-before-java.db
 /server/preptrack-before-planner.db
+
+# Temporary database inspection
+check-db.cjs
+server/preptrack-backup-new.db
