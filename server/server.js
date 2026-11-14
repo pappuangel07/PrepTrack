@@ -1,331 +1,21 @@
+'use strict';
 
 const express = require('express');
-const Database = require('better-sqlite3');
 const path = require('path');
+const { assertSchemaReady } = require('./auth/schema-readiness');
 
-const app = express();
-const PORT = 5000;
-
-app.use(express.json());
-
-// Open the SQLite database
-const dbPath = path.join(__dirname, 'preptrack.db');
-const db = new Database(dbPath);
-
-// Create the roadmap table
-db.exec(`
-  CREATE TABLE IF NOT EXISTS roadmap (
-    id INTEGER PRIMARY KEY,
-    title TEXT NOT NULL,
-    description TEXT NOT NULL,
-    status TEXT NOT NULL DEFAULT 'Not Started'
-  )
-`);
-
-// Insert initial roadmap items only when the table is empty
-const roadmapCount = db.prepare(
-  'SELECT COUNT(*) AS count FROM roadmap'
-).get();
-
-if (roadmapCount.count === 0) {
-  const insertRoadmap = db.prepare(`
-    INSERT INTO roadmap (id, title, description, status)
-    VALUES (?, ?, ?, ?)
-  `);
-
-  const initialItems = [
-    [1, 'Java', 'Learn programming fundamentals and OOP.', 'Not Started'],
-    [2, 'Data Structures and Algorithms', 'Learn DSA concepts and solve coding problems.', 'Not Started'],
-    [3, 'Aptitude', 'Practice quantitative, logical and verbal reasoning.', 'Not Started']
-  ];
-
-  const insertMany = db.transaction((items) => {
-    for (const item of items) {
-      insertRoadmap.run(...item);
-    }
-  });
-
-  insertMany(initialItems);
-}
-
-// Create the tasks table
-db.exec(`
-  CREATE TABLE IF NOT EXISTS tasks (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    title TEXT NOT NULL,
-    description TEXT NOT NULL DEFAULT '',
-    due_date TEXT,
-    completed INTEGER NOT NULL DEFAULT 0
-  )
-`);
-
-// Safely add priority to existing databases
-const taskColumns = db.prepare('PRAGMA table_info(tasks)').all();
-const hasPriority = taskColumns.some(
-  (column) => column.name === 'priority'
-);
-
-if (!hasPriority) {
-  db.exec(`
-    ALTER TABLE tasks
-    ADD COLUMN priority TEXT NOT NULL DEFAULT 'Medium'
-  `);
-}
-// Safely add deleted flag to existing databases
-const taskColumnsAfterPriority = db.prepare(
-  'PRAGMA table_info(tasks)'
-).all();
-
-const hasDeleted = taskColumnsAfterPriority.some(
-  (column) => column.name === 'deleted'
-);
-
-if (!hasDeleted) {
-  db.exec(`
-    ALTER TABLE tasks
-    ADD COLUMN deleted INTEGER NOT NULL DEFAULT 0
-  `);
-}
-
-// Create the study sessions table
-db.exec(`
-  CREATE TABLE IF NOT EXISTS study_sessions (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    subject TEXT NOT NULL
-      CHECK (subject IN ('Java', 'DSA', 'Aptitude')),
-    topic TEXT NOT NULL,
-    study_date TEXT NOT NULL,
-    start_time TEXT NOT NULL,
-    duration_minutes INTEGER NOT NULL
-      CHECK (duration_minutes > 0),
-    completed INTEGER NOT NULL DEFAULT 0
-      CHECK (completed IN (0, 1)),
-    created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
-  )
-`);
-
-
- // Create the Pomodoro focus sessions table
-db.exec(`
-  CREATE TABLE IF NOT EXISTS pomodoro_sessions (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    subject TEXT NOT NULL
-      CHECK (subject IN ('Java', 'DSA', 'Aptitude')),
-    duration_minutes INTEGER NOT NULL
-      CHECK (duration_minutes > 0),
-    completed_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
-  )
-`);
-
-
- // Create the Java topics table
-db.exec(`
-  CREATE TABLE IF NOT EXISTS java_topics (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    title TEXT NOT NULL UNIQUE,
-    category TEXT NOT NULL,
-    description TEXT NOT NULL DEFAULT '',
-    status TEXT NOT NULL DEFAULT 'Not Started'
-      CHECK (status IN ('Not Started', 'In Progress', 'Completed')),
-    sort_order INTEGER NOT NULL UNIQUE
-  )
-`);
-db.exec(`
-  CREATE TABLE IF NOT EXISTS dsa_topics (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    title TEXT NOT NULL UNIQUE,
-    category TEXT NOT NULL,
-    description TEXT NOT NULL DEFAULT '',
-    status TEXT NOT NULL DEFAULT 'Not Started'
-      CHECK (status IN ('Not Started', 'In Progress', 'Completed')),
-    sort_order INTEGER NOT NULL UNIQUE
-  )
-`);
-
-db.exec(`
-  CREATE TABLE IF NOT EXISTS aptitude_topics (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    title TEXT NOT NULL UNIQUE,
-    category TEXT NOT NULL,
-    description TEXT NOT NULL DEFAULT '',
-    status TEXT NOT NULL DEFAULT 'Not Started'
-      CHECK (status IN ('Not Started', 'In Progress', 'Completed')),
-    sort_order INTEGER NOT NULL UNIQUE
-  )
-`);
-
-// Create the notes table
-db.exec(`
-  CREATE TABLE IF NOT EXISTS notes (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    title TEXT NOT NULL,
-    subject TEXT NOT NULL
-      CHECK (subject IN ('Java', 'DSA', 'Aptitude')),
-    content TEXT NOT NULL DEFAULT '',
-    created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
-  )
-`);
-
-// Create the bookmarks table
-db.exec(`
-  CREATE TABLE IF NOT EXISTS bookmarks (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    title TEXT NOT NULL,
-    url TEXT NOT NULL,
-    subject TEXT NOT NULL
-      CHECK (subject IN ('Java', 'DSA', 'Aptitude')),
-    description TEXT NOT NULL DEFAULT '',
-    created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
-  )
-`);
-
-const aptitudeTopics = [
-  ['Number System', 'Quantitative Aptitude', 'Natural numbers, integers, divisibility, factors and multiples.', 1],
-  ['HCF and LCM', 'Quantitative Aptitude', 'Find HCF and LCM and solve related problems.', 2],
-  ['Simplification', 'Quantitative Aptitude', 'BODMAS, fractions, decimals and basic calculations.', 3],
-  ['Percentages', 'Quantitative Aptitude', 'Percentage conversions, increase, decrease and applications.', 4],
-  ['Ratio and Proportion', 'Quantitative Aptitude', 'Ratios, proportions and direct or inverse variation.', 5],
-  ['Averages', 'Quantitative Aptitude', 'Calculate averages and solve missing-value problems.', 6],
-  ['Profit and Loss', 'Quantitative Aptitude', 'Cost price, selling price, profit, loss and discount.', 7],
-  ['Simple Interest', 'Quantitative Aptitude', 'Principal, rate, time and simple interest calculations.', 8],
-  ['Compound Interest', 'Quantitative Aptitude', 'Compound interest, growth and depreciation basics.', 9],
-  ['Time and Work', 'Quantitative Aptitude', 'Work rates, combined work and efficiency.', 10],
-  ['Pipes and Cisterns', 'Quantitative Aptitude', 'Inlet, outlet and combined filling or emptying problems.', 11],
-  ['Time, Speed and Distance', 'Quantitative Aptitude', 'Speed, distance, time and relative motion.', 12],
-  ['Problems on Trains', 'Quantitative Aptitude', 'Train speed, crossing poles and crossing platforms.', 13],
-  ['Boats and Streams', 'Quantitative Aptitude', 'Upstream, downstream and stream speed problems.', 14],
-  ['Mixtures and Alligation', 'Quantitative Aptitude', 'Mixing quantities at different prices or concentrations.', 15],
-  ['Permutations and Combinations', 'Quantitative Aptitude', 'Counting arrangements and selections.', 16],
-  ['Probability', 'Quantitative Aptitude', 'Basic probability rules and common problems.', 17],
-  ['Data Interpretation', 'Quantitative Aptitude', 'Tables, bar charts, pie charts and line graphs.', 18],
-  ['Logical Reasoning', 'Logical Reasoning', 'Patterns, deductions and analytical reasoning.', 19],
-  ['Number and Letter Series', 'Logical Reasoning', 'Identify patterns in numerical and alphabetical sequences.', 20],
-  ['Coding and Decoding', 'Logical Reasoning', 'Recognize letter, number and symbol coding patterns.', 21],
-  ['Blood Relations', 'Logical Reasoning', 'Solve family relationship questions.', 22],
-  ['Directions and Distance', 'Logical Reasoning', 'Track directions, turns and relative positions.', 23],
-  ['Seating Arrangements', 'Logical Reasoning', 'Solve linear and circular arrangement problems.', 24],
-  ['Verbal Ability', 'Verbal Ability', 'Grammar, vocabulary, sentence correction and reading comprehension.', 25]
-];
-
-const insertAptitudeTopic = db.prepare(`
-  INSERT INTO aptitude_topics
-    (title, category, description, sort_order)
-  VALUES (?, ?, ?, ?)
-`);
-
-const insertAptitudeTopics = db.transaction((topics) => {
-  for (const topic of topics) {
-    insertAptitudeTopic.run(...topic);
+function createApp({ db } = {}) {
+  if (!db || typeof db.prepare !== 'function' || typeof db.pragma !== 'function') {
+    throw new TypeError('createApp requires an open better-sqlite3 database connection.');
   }
-});
-
-const existingAptitudeTopics = db
-  .prepare('SELECT COUNT(*) AS count FROM aptitude_topics')
-  .get().count;
-
-if (existingAptitudeTopics === 0) {
-  insertAptitudeTopics(aptitudeTopics);
-}
-
-const javaTopicCount = db.prepare(
-  'SELECT COUNT(*) AS count FROM java_topics'
-).get();
-
-if (javaTopicCount.count === 0) {
-  const javaTopics = [
-    ['Java Fundamentals', 'Core Java', 'JDK, JRE, JVM, program structure and main method.', 1],
-    ['Variables and Data Types', 'Core Java', 'Variables, primitive types, type casting and constants.', 2],
-    ['Operators', 'Core Java', 'Arithmetic, relational, logical and assignment operators.', 3],
-    ['Input and Output', 'Core Java', 'Scanner, user input and console output.', 4],
-    ['Conditional Statements', 'Control Flow', 'if, else if, else and switch.', 5],
-    ['Loops', 'Control Flow', 'for, while, do-while, break and continue.', 6],
-    ['Methods', 'Core Java', 'Parameters, return values, method overloading and scope.', 7],
-    ['Arrays', 'Core Java', 'One-dimensional and multidimensional arrays.', 8],
-    ['Strings', 'Core Java', 'String, StringBuilder, immutability and common methods.', 9],
-    ['Classes and Objects', 'OOP', 'Classes, objects, fields, methods and constructors.', 10],
-    ['Encapsulation', 'OOP', 'Access modifiers, getters, setters and data hiding.', 11],
-    ['Inheritance', 'OOP', 'extends, super and types of inheritance supported in Java.', 12],
-    ['Polymorphism', 'OOP', 'Method overloading and method overriding.', 13],
-    ['Abstraction and Interfaces', 'OOP', 'Abstract classes, interfaces and implementation.', 14],
-    ['Exception Handling', 'Core Java', 'try, catch, finally, throw, throws and custom exceptions.', 15],
-    ['Collections Framework', 'Collections', 'List, Set, Queue, Map and their common implementations.', 16],
-    ['Generics', 'Collections', 'Generic classes, methods and type safety.', 17],
-    ['File Handling', 'Core Java', 'Read and write files using Java I/O basics.', 18],
-    ['Lambda Expressions', 'Modern Java', 'Functional interfaces and lambda syntax.', 19],
-    ['Stream API', 'Modern Java', 'filter, map, sorted, collect and stream operations.', 20],
-    ['Multithreading Basics', 'Advanced Java', 'Threads, Runnable and synchronization basics.', 21],
-    ['Wrapper Classes and Autoboxing', 'Core Java', 'Wrapper types, boxing and unboxing.', 22],
-    ['Recursion', 'Problem Solving', 'Base cases, recursive calls and stack behavior.', 23],
-    ['Time and Space Complexity', 'Problem Solving', 'Big O notation and basic complexity analysis.', 24],
-    ['Java Coding Practice', 'Problem Solving', 'Solve beginner problems using methods, arrays and strings.', 25]
-  ];
-
-  const insertJavaTopic = db.prepare(`
-    INSERT INTO java_topics
-      (title, category, description, sort_order)
-    VALUES (?, ?, ?, ?)
-  `);
-
-  const insertJavaTopics = db.transaction((topics) => {
-    for (const topic of topics) {
-      insertJavaTopic.run(...topic);
-    }
-  });
-
-  insertJavaTopics(javaTopics);
-}
-
-const dsaTopics = [
-  ['DSA Introduction', 'Fundamentals', 'Understand data structures, algorithms and problem-solving.', 1],
-  ['Time and Space Complexity', 'Fundamentals', 'Understand Big O, time complexity and space complexity.', 2],
-  ['Arrays', 'Arrays', 'Traversal, insertion, deletion, searching and array problems.', 3],
-  ['Strings', 'Strings', 'String traversal, manipulation and common coding problems.', 4],
-  ['Searching', 'Searching and Sorting', 'Linear search and binary search.', 5],
-  ['Sorting', 'Searching and Sorting', 'Bubble, selection, insertion, merge and quick sort.', 6],
-  ['Recursion', 'Recursion and Backtracking', 'Base cases, recursive calls and recursion trees.', 7],
-  ['Backtracking', 'Recursion and Backtracking', 'Solve problems by exploring and undoing choices.', 8],
-  ['Linked Lists', 'Linked Lists', 'Singly linked lists, doubly linked lists and operations.', 9],
-  ['Stacks', 'Stacks and Queues', 'Stack operations and stack-based problems.', 10],
-  ['Queues', 'Stacks and Queues', 'Queues, circular queues and deque basics.', 11],
-  ['Hashing', 'Hashing', 'Hash maps, hash sets and frequency counting.', 12],
-  ['Two Pointers', 'Problem-Solving Patterns', 'Solve array and string problems using two pointers.', 13],
-  ['Sliding Window', 'Problem-Solving Patterns', 'Fixed and variable sliding-window techniques.', 14],
-  ['Binary Trees', 'Trees', 'Tree traversal, height and basic tree operations.', 15],
-  ['Binary Search Trees', 'Trees', 'BST search, insertion and deletion basics.', 16],
-  ['Heaps and Priority Queues', 'Trees and Heaps', 'Heap operations and priority queue problems.', 17],
-  ['Graphs', 'Graphs', 'Graph representation, BFS and DFS.', 18],
-  ['Greedy Algorithms', 'Algorithms', 'Make locally optimal choices and solve greedy problems.', 19],
-  ['Dynamic Programming', 'Algorithms', 'Memoization, tabulation and common DP patterns.', 20],
-  ['Trie', 'Advanced Data Structures', 'Prefix trees and string-search applications.', 21],
-  ['Disjoint Set Union', 'Advanced Data Structures', 'Union-Find, path compression and union by rank.', 22],
-  ['Bit Manipulation', 'Advanced Topics', 'Bitwise operators and common bit manipulation problems.', 23],
-  ['Monotonic Stack and Queue', 'Advanced Topics', 'Use monotonic structures to solve range problems.', 24],
-  ['DSA Coding Practice', 'Problem Solving', 'Practice problems from easy to medium difficulty.', 25]
-];
-
-const insertDsaTopic = db.prepare(`
-  INSERT INTO dsa_topics
-    (title, category, description, sort_order)
-  VALUES (?, ?, ?, ?)
-`);
-
-const insertDsaTopics = db.transaction((topics) => {
-  for (const topic of topics) {
-    insertDsaTopic.run(...topic);
+  db.pragma('foreign_keys = ON');
+  if (db.pragma('foreign_keys')[0]?.foreign_keys !== 1) {
+    throw new Error('SQLite foreign-key enforcement could not be enabled.');
   }
-});
+  assertSchemaReady(db);
 
-const existingDsaTopics = db
-  .prepare('SELECT COUNT(*) AS count FROM dsa_topics')
-  .get().count;
-
-if (existingDsaTopics === 0) {
-  insertDsaTopics(dsaTopics);
-}
-
+  const app = express();
+  app.use(express.json());
 // Allowed task priorities
 const allowedPriorities = ['High', 'Medium', 'Low'];
 
@@ -1514,11 +1204,45 @@ app.get('/api/study-streak', (req, res) => {
     });
   }
 });
+  return app;
+}
 
+function startServer({ databasePath = path.join(__dirname, 'preptrack.db'), port = 5000, DatabaseClass } = {}) {
+  let db;
+  try {
+    const Database = DatabaseClass || require('better-sqlite3');
+    db = new Database(databasePath);
+    const app = createApp({ db });
+    const server = app.listen(port, () => {
+      console.log(`PrepTrack server running on http://localhost:${port}`);
+    });
+    let hasListened = false;
+    server.once('listening', () => { hasListened = true; });
+    server.on('error', (error) => {
+     const message = hasListened
+  ? 'PrepTrack server error'
+  : 'PrepTrack startup failed';
 
-// Start the backend server
-app.listen(PORT, () => {
-  console.log(
-    `PrepTrack server running on http://localhost:${PORT}`
-  );
-});
+console.error(`${message}: ${error.message}`);
+      process.exitCode = 1;
+      if (!hasListened) {
+        if (db?.open) db.close();
+      } else if (server.listening) {
+        server.close();
+      }
+    });
+    server.once('close', () => {
+      if (db?.open) db.close();
+    });
+    return server;
+  } catch (error) {
+    if (db?.open) db.close();
+    console.error(`PrepTrack startup failed: ${error.message}`);
+    process.exitCode = 1;
+    return null;
+  }
+}
+
+if (require.main === module) startServer();
+
+module.exports = { createApp, startServer };
