@@ -408,3 +408,58 @@ test('session store writes and tombstones remain single-row under same-process p
   await assert.rejects(callbackCall(one, 'set', fresh.sid, stale), /revoked|missing/);
   assert.ok(tombstoneFor(fixture.db, one, fresh.sid));
 });
+
+
+test('loaded session cannot change its student ownership', async (t) => {
+  const fixture = disposableAuthDatabase();
+  t.after(() => fixture.close());
+
+  const store = new SQLiteSessionStore(fixture.db);
+  const now = Date.now();
+
+  const fresh = freshSession(store, fixture.studentId, now);
+  await callbackCall(store, 'set', fresh.sid, fresh.session);
+
+  const loaded = await loadedSession(store, fresh.sid);
+  loaded.studentId = null;
+
+  await assert.rejects(
+    callbackCall(store, 'set', fresh.sid, loaded),
+    /ownership|student/i
+  );
+
+  const row = fixture.db.prepare(
+    'SELECT student_id FROM sessions WHERE sid = ?'
+  ).get(fresh.sid);
+
+  assert.equal(row.student_id, fixture.studentId);
+});
+
+test('touch cannot extend a session after its student ownership changes', async (t) => {
+  const fixture = disposableAuthDatabase();
+  t.after(() => fixture.close());
+
+  const store = new SQLiteSessionStore(fixture.db);
+  const now = Date.now();
+
+  const fresh = freshSession(store, fixture.studentId, now);
+  await callbackCall(store, 'set', fresh.sid, fresh.session);
+
+  const loaded = await loadedSession(store, fresh.sid);
+  const before = fixture.db.prepare(
+    'SELECT student_id, expires_at_ms FROM sessions WHERE sid = ?'
+  ).get(fresh.sid);
+
+  loaded.studentId = null;
+
+  await assert.rejects(
+    callbackCall(store, 'touch', fresh.sid, loaded),
+    /ownership|student/i
+  );
+
+  const after = fixture.db.prepare(
+    'SELECT student_id, expires_at_ms FROM sessions WHERE sid = ?'
+  ).get(fresh.sid);
+
+  assert.deepEqual(after, before);
+});

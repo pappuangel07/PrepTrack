@@ -1,40 +1,129 @@
+
 'use strict';
 
 const express = require('express');
 const path = require('path');
-const { assertSchemaReady } = require('./auth/schema-readiness');
+const session = require('express-session');
 
-function createApp({ db } = {}) {
-  if (!db || typeof db.prepare !== 'function' || typeof db.pragma !== 'function') {
-    throw new TypeError('createApp requires an open better-sqlite3 database connection.');
+const { assertSchemaReady } = require('./auth/schema-readiness');
+const { SQLiteSessionStore } = require('./auth/sqlite-session-store');
+const {
+  createSessionOptions,
+  createSessionProvenanceMiddleware,
+} = require('./auth/session-config');
+const {
+  createCsrfMiddleware,
+  issueCsrfToken,
+} = require('./auth/csrf');
+const { PersistentRateLimiter } = require('./auth/rate-limiter');
+const { createAuthRouter } = require('./auth/auth-routes');
+const { requireStudent } = require('./auth/require-student');
+
+function createApp({
+  db,
+  sessionSecret,
+  rateLimitSecret,
+  appOrigin,
+  env = process.env,
+} = {}) {
+  if (
+    !db ||
+    typeof db.prepare !== 'function' ||
+    typeof db.pragma !== 'function'
+  ) {
+    throw new TypeError(
+      'createApp requires an open better-sqlite3 database connection.'
+    );
   }
+
   db.pragma('foreign_keys = ON');
+
   if (db.pragma('foreign_keys')[0]?.foreign_keys !== 1) {
     throw new Error('SQLite foreign-key enforcement could not be enabled.');
   }
+
   assertSchemaReady(db);
 
   const app = express();
+
   app.use(express.json());
-// Allowed task priorities
-const allowedPriorities = ['High', 'Medium', 'Low'];
+
+  // Persistent SQLite-backed sessions.
+  const sessionStore = new SQLiteSessionStore(db);
+
+  const sessionOptions = createSessionOptions({
+    secret: sessionSecret,
+    store: sessionStore,
+    env,
+    appOrigin,
+  });
+
+  app.use(session(sessionOptions));
+
+  // Bind generated session IDs to their request provenance.
+  app.use(createSessionProvenanceMiddleware(sessionStore));
+
+  // Protect all unsafe HTTP requests against CSRF.
+  app.use(createCsrfMiddleware({
+    expectedOrigin: appOrigin,
+  }));
+
+  // Issue a CSRF token for the current browser session.
+  app.get('/api/csrf-token', (req, res) => {
+    return res.json({
+      csrfToken: issueCsrfToken(req),
+    });
+  });
+
+  // Authentication endpoints.
+  const rateLimiter = new PersistentRateLimiter(db, {
+    hmacSecret: rateLimitSecret,
+  });
+
+  app.use('/api/auth', createAuthRouter({
+    db,
+    rateLimiter,
+    env,
+  }));
+
+  // Public backend health endpoint
+app.get('/', (req, res) => {
+  res.json({ message: 'PrepTrack backend is running!' });
+});
+
+  // All remaining API endpoints require an authenticated student.
+  app.use('/api', requireStudent);
+
+  // Allowed task priorities
+  const allowedPriorities = ['High', 'Medium', 'Low'];
+
 
  // ======================================
 // JAVA TOPICS API
 // ======================================
 
 // Get all Java topics
+
 app.get('/api/java-topics', (req, res) => {
   const topics = db.prepare(`
-    SELECT id, title, category, description, status, sort_order
-    FROM java_topics
-    ORDER BY sort_order
-  `).all();
+    SELECT
+      topics.id,
+      topics.title,
+      topics.category,
+      topics.description,
+      COALESCE(progress.status, 'Not Started') AS status,
+      topics.sort_order
+    FROM java_topics AS topics
+    LEFT JOIN java_topic_progress AS progress
+      ON progress.topic_id = topics.id
+      AND progress.student_id = ?
+    ORDER BY topics.sort_order
+  `).all(req.student.id);
 
   res.json(topics);
 });
 
-// Update a Java topic's status
+// Update a Java topic's status for the current student
 app.patch('/api/java-topics/:id', (req, res) => {
   const id = Number(req.params.id);
   const { status } = req.body;
@@ -67,19 +156,38 @@ app.patch('/api/java-topics/:id', (req, res) => {
     });
   }
 
-  db.prepare(
-    'UPDATE java_topics SET status = ? WHERE id = ?'
-  ).run(status, id);
+  db.prepare(`
+    INSERT INTO java_topic_progress (
+      student_id,
+      topic_id,
+      status,
+      updated_at
+    )
+    VALUES (?, ?, ?, CURRENT_TIMESTAMP)
+    ON CONFLICT(student_id, topic_id)
+    DO UPDATE SET
+      status = excluded.status,
+      updated_at = CURRENT_TIMESTAMP
+  `).run(req.student.id, id, status);
 
-  const updatedTopic = db.prepare(
-    'SELECT id, title, category, description, status, sort_order FROM java_topics WHERE id = ?'
-  ).get(id);
+  const updatedTopic = db.prepare(`
+    SELECT
+      topics.id,
+      topics.title,
+      topics.category,
+      topics.description,
+      COALESCE(progress.status, 'Not Started') AS status,
+      topics.sort_order
+    FROM java_topics AS topics
+    LEFT JOIN java_topic_progress AS progress
+      ON progress.topic_id = topics.id
+      AND progress.student_id = ?
+    WHERE topics.id = ?
+  `).get(req.student.id, id);
 
-  res.json({
-    message: 'Java topic status updated successfully',
-    topic: updatedTopic
-  });
+  res.json(updatedTopic);
 });
+
 
 
  // ======================================
@@ -87,64 +195,90 @@ app.patch('/api/java-topics/:id', (req, res) => {
  // ======================================
 
  // Get all DSA topics
- app.get('/api/dsa-topics', (req, res) => {
-   const topics = db.prepare(`
-     SELECT id, title, category, description, status, sort_order
-     FROM dsa_topics
-     ORDER BY sort_order
-   `).all();
 
-   res.json(topics);
- });
+app.get('/api/dsa-topics', (req, res) => {
+  const topics = db.prepare(`
+    SELECT
+      topics.id,
+      topics.title,
+      topics.category,
+      topics.description,
+      COALESCE(progress.status, 'Not Started') AS status,
+      topics.sort_order
+    FROM dsa_topics AS topics
+    LEFT JOIN dsa_topic_progress AS progress
+      ON progress.topic_id = topics.id
+      AND progress.student_id = ?
+    ORDER BY topics.sort_order
+  `).all(req.student.id);
 
- // Update a DSA topic's status
- app.patch('/api/dsa-topics/:id', (req, res) => {
-   const id = Number(req.params.id);
-   const { status } = req.body;
+  res.json(topics);
+});
 
-   const allowedStatuses = [
-     'Not Started',
-     'In Progress',
-     'Completed'
-   ];
+// Update a DSA topic's status for the current student
+app.patch('/api/dsa-topics/:id', (req, res) => {
+  const id = Number(req.params.id);
+  const { status } = req.body;
 
-   if (!Number.isInteger(id) || id < 1) {
-     return res.status(400).json({
-       message: 'Invalid DSA topic ID'
-     });
-   }
+  const allowedStatuses = [
+    'Not Started',
+    'In Progress',
+    'Completed'
+  ];
 
-   if (!allowedStatuses.includes(status)) {
-     return res.status(400).json({
-       message: 'Invalid status'
-     });
-   }
+  if (!Number.isInteger(id) || id < 1) {
+    return res.status(400).json({
+      message: 'Invalid DSA topic ID'
+    });
+  }
 
-   const topic = db.prepare(
-     'SELECT * FROM dsa_topics WHERE id = ?'
-   ).get(id);
+  if (!allowedStatuses.includes(status)) {
+    return res.status(400).json({
+      message: 'Invalid status'
+    });
+  }
 
-   if (!topic) {
-     return res.status(404).json({
-       message: 'DSA topic not found'
-     });
-   }
+  const topic = db.prepare(
+    'SELECT * FROM dsa_topics WHERE id = ?'
+  ).get(id);
 
-   db.prepare(
-     'UPDATE dsa_topics SET status = ? WHERE id = ?'
-   ).run(status, id);
+  if (!topic) {
+    return res.status(404).json({
+      message: 'DSA topic not found'
+    });
+  }
 
-   const updatedTopic = db.prepare(`
-     SELECT id, title, category, description, status, sort_order
-     FROM dsa_topics
-     WHERE id = ?
-   `).get(id);
+  db.prepare(`
+    INSERT INTO dsa_topic_progress (
+      student_id,
+      topic_id,
+      status,
+      updated_at
+    )
+    VALUES (?, ?, ?, CURRENT_TIMESTAMP)
+    ON CONFLICT(student_id, topic_id)
+    DO UPDATE SET
+      status = excluded.status,
+      updated_at = CURRENT_TIMESTAMP
+  `).run(req.student.id, id, status);
 
-   res.json({
-     message: 'DSA topic status updated successfully',
-     topic: updatedTopic
-   });
- });
+  const updatedTopic = db.prepare(`
+    SELECT
+      topics.id,
+      topics.title,
+      topics.category,
+      topics.description,
+      COALESCE(progress.status, 'Not Started') AS status,
+      topics.sort_order
+    FROM dsa_topics AS topics
+    LEFT JOIN dsa_topic_progress AS progress
+      ON progress.topic_id = topics.id
+      AND progress.student_id = ?
+    WHERE topics.id = ?
+  `).get(req.student.id, id);
+
+  res.json(updatedTopic);
+});
 
  
 /* ======================================
@@ -152,17 +286,27 @@ app.patch('/api/java-topics/:id', (req, res) => {
 ====================================== */
 
 // Get all Aptitude topics
+
 app.get('/api/aptitude-topics', (req, res) => {
   const topics = db.prepare(`
-    SELECT id, title, category, description, status, sort_order
-    FROM aptitude_topics
-    ORDER BY sort_order
-  `).all();
+    SELECT
+      topics.id,
+      topics.title,
+      topics.category,
+      topics.description,
+      COALESCE(progress.status, 'Not Started') AS status,
+      topics.sort_order
+    FROM aptitude_topics AS topics
+    LEFT JOIN aptitude_topic_progress AS progress
+      ON progress.topic_id = topics.id
+      AND progress.student_id = ?
+    ORDER BY topics.sort_order
+  `).all(req.student.id);
 
   res.json(topics);
 });
 
-// Update an Aptitude topic's status
+// Update an Aptitude topic's status for the current student
 app.patch('/api/aptitude-topics/:id', (req, res) => {
   const id = Number(req.params.id);
   const { status } = req.body;
@@ -195,43 +339,64 @@ app.patch('/api/aptitude-topics/:id', (req, res) => {
     });
   }
 
-  db.prepare(
-    'UPDATE aptitude_topics SET status = ? WHERE id = ?'
-  ).run(status, id);
+  db.prepare(`
+    INSERT INTO aptitude_topic_progress (
+      student_id,
+      topic_id,
+      status,
+      updated_at
+    )
+    VALUES (?, ?, ?, CURRENT_TIMESTAMP)
+    ON CONFLICT(student_id, topic_id)
+    DO UPDATE SET
+      status = excluded.status,
+      updated_at = CURRENT_TIMESTAMP
+  `).run(req.student.id, id, status);
 
   const updatedTopic = db.prepare(`
-    SELECT id, title, category, description, status, sort_order
-    FROM aptitude_topics
-    WHERE id = ?
-  `).get(id);
+    SELECT
+      topics.id,
+      topics.title,
+      topics.category,
+      topics.description,
+      COALESCE(progress.status, 'Not Started') AS status,
+      topics.sort_order
+    FROM aptitude_topics AS topics
+    LEFT JOIN aptitude_topic_progress AS progress
+      ON progress.topic_id = topics.id
+      AND progress.student_id = ?
+    WHERE topics.id = ?
+  `).get(req.student.id, id);
 
-  res.json({
-    message: 'Aptitude topic status updated successfully',
-    topic: updatedTopic
-  });
+  res.json(updatedTopic);
 });
 
-// Home route
-app.get('/', (req, res) => {
-  res.json({
-    message: 'PrepTrack backend is running!'
-  });
-});
+
 
 // ======================================
 // ROADMAP API
 // ======================================
 
 // Get all roadmap items
+
 app.get('/api/roadmap', (req, res) => {
-  const roadmap = db.prepare(
-    'SELECT * FROM roadmap ORDER BY id'
-  ).all();
+  const roadmap = db.prepare(`
+    SELECT
+      items.id,
+      items.title,
+      items.description,
+      COALESCE(progress.status, 'Not Started') AS status
+    FROM roadmap AS items
+    LEFT JOIN roadmap_progress AS progress
+      ON progress.roadmap_id = items.id
+      AND progress.student_id = ?
+    ORDER BY items.id
+  `).all(req.student.id);
 
   res.json(roadmap);
 });
 
-// Update a roadmap item's status
+// Update a roadmap item's status for the current student
 app.patch('/api/roadmap/:id', (req, res) => {
   const id = Number(req.params.id);
   const { status } = req.body;
@@ -264,35 +429,57 @@ app.patch('/api/roadmap/:id', (req, res) => {
     });
   }
 
-  db.prepare(
-    'UPDATE roadmap SET status = ? WHERE id = ?'
-  ).run(status, id);
+  db.prepare(`
+    INSERT INTO roadmap_progress (
+      student_id,
+      roadmap_id,
+      status,
+      updated_at
+    )
+    VALUES (?, ?, ?, CURRENT_TIMESTAMP)
+    ON CONFLICT(student_id, roadmap_id)
+    DO UPDATE SET
+      status = excluded.status,
+      updated_at = CURRENT_TIMESTAMP
+  `).run(req.student.id, id, status);
 
-  const updatedItem = db.prepare(
-    'SELECT * FROM roadmap WHERE id = ?'
-  ).get(id);
+  const updatedItem = db.prepare(`
+    SELECT
+      items.id,
+      items.title,
+      items.description,
+      COALESCE(progress.status, 'Not Started') AS status
+    FROM roadmap AS items
+    LEFT JOIN roadmap_progress AS progress
+      ON progress.roadmap_id = items.id
+      AND progress.student_id = ?
+    WHERE items.id = ?
+  `).get(req.student.id, id);
 
-  res.json({
-    message: 'Progress updated successfully',
-    item: updatedItem
-  });
+  res.json(updatedItem);
 });
+
+
+// ======================================
 
 // ======================================
 // TASK MANAGEMENT API
 // ======================================
-// Get all active tasks
+
+// Get all active tasks belonging to the logged-in student
 app.get('/api/tasks', (req, res) => {
-  const tasks = db.prepare(
-    'SELECT * FROM tasks WHERE deleted = 0 ORDER BY id DESC'
-  ).all();
+  const tasks = db.prepare(`
+    SELECT *
+    FROM tasks
+    WHERE student_id = ? AND deleted = 0
+    ORDER BY id DESC
+  `).all(req.student.id);
 
   res.json(tasks);
 });
 
-// Create a new task
+// Create a new task for the logged-in student
 app.post('/api/tasks', (req, res) => {
-  console.log('Incoming task data:', req.body);
   const {
     title,
     description = '',
@@ -329,18 +516,27 @@ app.post('/api/tasks', (req, res) => {
   }
 
   const result = db.prepare(`
-    INSERT INTO tasks (title, description, due_date, priority)
-    VALUES (?, ?, ?, ?)
+    INSERT INTO tasks (
+      student_id,
+      title,
+      description,
+      due_date,
+      priority
+    )
+    VALUES (?, ?, ?, ?, ?)
   `).run(
+    req.student.id,
     title.trim(),
     description.trim(),
     due_date,
     priority
   );
 
-  const newTask = db.prepare(
-    'SELECT * FROM tasks WHERE id = ?'
-  ).get(result.lastInsertRowid);
+  const newTask = db.prepare(`
+    SELECT *
+    FROM tasks
+    WHERE id = ? AND student_id = ?
+  `).get(Number(result.lastInsertRowid), req.student.id);
 
   res.status(201).json({
     message: 'Task created successfully',
@@ -351,6 +547,8 @@ app.post('/api/tasks', (req, res) => {
 // Update task details and/or completion status
 app.patch('/api/tasks/:id', (req, res) => {
   const id = Number(req.params.id);
+  const studentId = req.student.id;
+
   const {
     completed,
     title,
@@ -365,9 +563,12 @@ app.patch('/api/tasks/:id', (req, res) => {
     });
   }
 
-  const task = db.prepare(
-    'SELECT * FROM tasks WHERE id = ?'
-  ).get(id);
+  // Only find tasks owned by this student
+  const task = db.prepare(`
+    SELECT *
+    FROM tasks
+    WHERE id = ? AND student_id = ?
+  `).get(id, studentId);
 
   if (!task) {
     return res.status(404).json({
@@ -375,14 +576,12 @@ app.patch('/api/tasks/:id', (req, res) => {
     });
   }
 
-  // Validate completion status if provided
   if (completed !== undefined && typeof completed !== 'boolean') {
     return res.status(400).json({
       message: 'Completed must be true or false'
     });
   }
 
-  // Validate priority if provided
   if (
     priority !== undefined &&
     !allowedPriorities.includes(priority)
@@ -392,7 +591,6 @@ app.patch('/api/tasks/:id', (req, res) => {
     });
   }
 
-  // Validate and update task details if provided
   if (
     title !== undefined ||
     description !== undefined ||
@@ -432,26 +630,30 @@ app.patch('/api/tasks/:id', (req, res) => {
     db.prepare(`
       UPDATE tasks
       SET title = ?, description = ?, due_date = ?, priority = ?
-      WHERE id = ?
+      WHERE id = ? AND student_id = ?
     `).run(
       newTitle.trim(),
       newDescription.trim(),
       newDueDate,
       newPriority,
-      id
+      id,
+      studentId
     );
   }
 
-  // Update completion status if provided
   if (completed !== undefined) {
-    db.prepare(
-      'UPDATE tasks SET completed = ? WHERE id = ?'
-    ).run(completed ? 1 : 0, id);
+    db.prepare(`
+      UPDATE tasks
+      SET completed = ?
+      WHERE id = ? AND student_id = ?
+    `).run(completed ? 1 : 0, id, studentId);
   }
 
-  const updatedTask = db.prepare(
-    'SELECT * FROM tasks WHERE id = ?'
-  ).get(id);
+  const updatedTask = db.prepare(`
+    SELECT *
+    FROM tasks
+    WHERE id = ? AND student_id = ?
+  `).get(id, studentId);
 
   res.json({
     message: 'Task updated successfully',
@@ -459,7 +661,7 @@ app.patch('/api/tasks/:id', (req, res) => {
   });
 });
 
-// Soft delete a task
+// Soft-delete a task belonging to the logged-in student
 app.delete('/api/tasks/:id', (req, res) => {
   const id = Number(req.params.id);
 
@@ -469,9 +671,13 @@ app.delete('/api/tasks/:id', (req, res) => {
     });
   }
 
-  const result = db.prepare(
-    'UPDATE tasks SET deleted = 1 WHERE id = ? AND deleted = 0'
-  ).run(id);
+  const result = db.prepare(`
+    UPDATE tasks
+    SET deleted = 1
+    WHERE id = ?
+      AND student_id = ?
+      AND deleted = 0
+  `).run(id, req.student.id);
 
   if (result.changes === 0) {
     return res.status(404).json({
@@ -483,7 +689,8 @@ app.delete('/api/tasks/:id', (req, res) => {
     message: 'Task deleted successfully'
   });
 });
-// Restore a deleted task
+
+// Restore a deleted task belonging to the logged-in student
 app.patch('/api/tasks/:id/restore', (req, res) => {
   const id = Number(req.params.id);
 
@@ -493,9 +700,13 @@ app.patch('/api/tasks/:id/restore', (req, res) => {
     });
   }
 
-  const result = db.prepare(
-    'UPDATE tasks SET deleted = 0 WHERE id = ? AND deleted = 1'
-  ).run(id);
+  const result = db.prepare(`
+    UPDATE tasks
+    SET deleted = 0
+    WHERE id = ?
+      AND student_id = ?
+      AND deleted = 1
+  `).run(id, req.student.id);
 
   if (result.changes === 0) {
     return res.status(404).json({
@@ -503,9 +714,11 @@ app.patch('/api/tasks/:id/restore', (req, res) => {
     });
   }
 
-  const task = db.prepare(
-    'SELECT * FROM tasks WHERE id = ?'
-  ).get(id);
+  const task = db.prepare(`
+    SELECT *
+    FROM tasks
+    WHERE id = ? AND student_id = ?
+  `).get(id, req.student.id);
 
   res.json({
     message: 'Task restored successfully',
@@ -513,24 +726,27 @@ app.patch('/api/tasks/:id/restore', (req, res) => {
   });
 });
 
+
+
 // ======================================
 // STUDY PLANNER API
 // ======================================
 
 const allowedSubjects = ['Java', 'DSA', 'Aptitude'];
 
-// Get all study sessions
+// Get study sessions belonging to the logged-in student
 app.get('/api/study-sessions', (req, res) => {
   const sessions = db.prepare(`
     SELECT *
     FROM study_sessions
+    WHERE student_id = ?
     ORDER BY study_date, start_time
-  `).all();
+  `).all(req.student.id);
 
   res.json(sessions);
 });
 
-// Create a study session
+// Create a study session for the logged-in student
 app.post('/api/study-sessions', (req, res) => {
   const {
     subject,
@@ -584,9 +800,10 @@ app.post('/api/study-sessions', (req, res) => {
 
   const result = db.prepare(`
     INSERT INTO study_sessions
-      (subject, topic, study_date, start_time, duration_minutes)
-    VALUES (?, ?, ?, ?, ?)
+      (student_id, subject, topic, study_date, start_time, duration_minutes)
+    VALUES (?, ?, ?, ?, ?, ?)
   `).run(
+    req.student.id,
     subject,
     topic.trim(),
     study_date,
@@ -595,8 +812,10 @@ app.post('/api/study-sessions', (req, res) => {
   );
 
   const newSession = db.prepare(`
-    SELECT * FROM study_sessions WHERE id = ?
-  `).get(result.lastInsertRowid);
+    SELECT *
+    FROM study_sessions
+    WHERE id = ? AND student_id = ?
+  `).get(Number(result.lastInsertRowid), req.student.id);
 
   res.status(201).json({
     message: 'Study session created successfully',
@@ -604,9 +823,10 @@ app.post('/api/study-sessions', (req, res) => {
   });
 });
 
-// Update a study session
+// Update a study session belonging to the logged-in student
 app.patch('/api/study-sessions/:id', (req, res) => {
   const id = Number(req.params.id);
+  const studentId = req.student.id;
 
   if (!Number.isInteger(id) || id < 1) {
     return res.status(400).json({
@@ -614,9 +834,11 @@ app.patch('/api/study-sessions/:id', (req, res) => {
     });
   }
 
-  const session = db.prepare(
-    'SELECT * FROM study_sessions WHERE id = ?'
-  ).get(id);
+  const session = db.prepare(`
+    SELECT *
+    FROM study_sessions
+    WHERE id = ? AND student_id = ?
+  `).get(id, studentId);
 
   if (!session) {
     return res.status(404).json({
@@ -696,7 +918,7 @@ app.patch('/api/study-sessions/:id', (req, res) => {
         start_time = ?,
         duration_minutes = ?,
         completed = ?
-    WHERE id = ?
+    WHERE id = ? AND student_id = ?
   `).run(
     newSubject,
     newTopic.trim(),
@@ -704,12 +926,15 @@ app.patch('/api/study-sessions/:id', (req, res) => {
     newTime,
     newDuration,
     newCompleted ? 1 : 0,
-    id
+    id,
+    studentId
   );
 
-  const updatedSession = db.prepare(
-    'SELECT * FROM study_sessions WHERE id = ?'
-  ).get(id);
+  const updatedSession = db.prepare(`
+    SELECT *
+    FROM study_sessions
+    WHERE id = ? AND student_id = ?
+  `).get(id, studentId);
 
   res.json({
     message: 'Study session updated successfully',
@@ -717,7 +942,7 @@ app.patch('/api/study-sessions/:id', (req, res) => {
   });
 });
 
-// Delete a study session
+// Delete a study session belonging to the logged-in student
 app.delete('/api/study-sessions/:id', (req, res) => {
   const id = Number(req.params.id);
 
@@ -727,9 +952,10 @@ app.delete('/api/study-sessions/:id', (req, res) => {
     });
   }
 
-  const result = db.prepare(
-    'DELETE FROM study_sessions WHERE id = ?'
-  ).run(id);
+  const result = db.prepare(`
+    DELETE FROM study_sessions
+    WHERE id = ? AND student_id = ?
+  `).run(id, req.student.id);
 
   if (result.changes === 0) {
     return res.status(404).json({
@@ -742,26 +968,27 @@ app.delete('/api/study-sessions/:id', (req, res) => {
   });
 });
 
-
- // Get all completed Pomodoro sessions
+ // Get completed Pomodoro sessions belonging to the logged-in student
 app.get('/api/pomodoro-sessions', (req, res) => {
   const sessions = db.prepare(`
     SELECT *
     FROM pomodoro_sessions
+    WHERE student_id = ?
     ORDER BY completed_at DESC, id DESC
-  `).all();
+  `).all(req.student.id);
 
   res.json(sessions);
 });
 
-// Get all bookmarks
+// Get bookmarks belonging to the logged-in student
 app.get('/api/bookmarks', (req, res) => {
   try {
     const bookmarks = db.prepare(`
       SELECT *
       FROM bookmarks
+      WHERE student_id = ?
       ORDER BY updated_at DESC, id DESC
-    `).all();
+    `).all(req.student.id);
 
     res.json(bookmarks);
   } catch (error) {
@@ -773,18 +1000,18 @@ app.get('/api/bookmarks', (req, res) => {
   }
 });
 
-// Create a new bookmark
+// Create a bookmark for the logged-in student
 app.post('/api/bookmarks', (req, res) => {
   try {
     const { title, url, subject, description } = req.body;
 
-    if (!title || !title.trim()) {
+    if (typeof title !== 'string' || !title.trim()) {
       return res.status(400).json({
         message: 'Bookmark title is required',
       });
     }
 
-    if (!url || !url.trim()) {
+    if (typeof url !== 'string' || !url.trim()) {
       return res.status(400).json({
         message: 'Bookmark URL is required',
       });
@@ -812,10 +1039,18 @@ app.post('/api/bookmarks', (req, res) => {
       });
     }
 
+    if (description !== undefined && typeof description !== 'string') {
+      return res.status(400).json({
+        message: 'Invalid bookmark description',
+      });
+    }
+
     const result = db.prepare(`
-      INSERT INTO bookmarks (title, url, subject, description)
-      VALUES (?, ?, ?, ?)
+      INSERT INTO bookmarks
+        (student_id, title, url, subject, description)
+      VALUES (?, ?, ?, ?, ?)
     `).run(
+      req.student.id,
       title.trim(),
       parsedUrl.href,
       subject,
@@ -823,8 +1058,10 @@ app.post('/api/bookmarks', (req, res) => {
     );
 
     const bookmark = db.prepare(`
-      SELECT * FROM bookmarks WHERE id = ?
-    `).get(result.lastInsertRowid);
+      SELECT *
+      FROM bookmarks
+      WHERE id = ? AND student_id = ?
+    `).get(Number(result.lastInsertRowid), req.student.id);
 
     res.status(201).json(bookmark);
   } catch (error) {
@@ -836,7 +1073,7 @@ app.post('/api/bookmarks', (req, res) => {
   }
 });
 
-// Update an existing bookmark
+// Update a bookmark belonging to the logged-in student
 app.put('/api/bookmarks/:id', (req, res) => {
   try {
     const { title, url, subject, description } = req.body;
@@ -848,13 +1085,13 @@ app.put('/api/bookmarks/:id', (req, res) => {
       });
     }
 
-    if (!title || !title.trim()) {
+    if (typeof title !== 'string' || !title.trim()) {
       return res.status(400).json({
         message: 'Bookmark title is required',
       });
     }
 
-    if (!url || !url.trim()) {
+    if (typeof url !== 'string' || !url.trim()) {
       return res.status(400).json({
         message: 'Bookmark URL is required',
       });
@@ -882,6 +1119,12 @@ app.put('/api/bookmarks/:id', (req, res) => {
       });
     }
 
+    if (description !== undefined && typeof description !== 'string') {
+      return res.status(400).json({
+        message: 'Invalid bookmark description',
+      });
+    }
+
     const result = db.prepare(`
       UPDATE bookmarks
       SET title = ?,
@@ -889,13 +1132,14 @@ app.put('/api/bookmarks/:id', (req, res) => {
           subject = ?,
           description = ?,
           updated_at = CURRENT_TIMESTAMP
-      WHERE id = ?
+      WHERE id = ? AND student_id = ?
     `).run(
       title.trim(),
       parsedUrl.href,
       subject,
       description || '',
-      bookmarkId
+      bookmarkId,
+      req.student.id
     );
 
     if (result.changes === 0) {
@@ -905,8 +1149,10 @@ app.put('/api/bookmarks/:id', (req, res) => {
     }
 
     const updatedBookmark = db.prepare(`
-      SELECT * FROM bookmarks WHERE id = ?
-    `).get(bookmarkId);
+      SELECT *
+      FROM bookmarks
+      WHERE id = ? AND student_id = ?
+    `).get(bookmarkId, req.student.id);
 
     res.json(updatedBookmark);
   } catch (error) {
@@ -918,7 +1164,7 @@ app.put('/api/bookmarks/:id', (req, res) => {
   }
 });
 
-// Delete a bookmark
+// Delete a bookmark belonging to the logged-in student
 app.delete('/api/bookmarks/:id', (req, res) => {
   try {
     const bookmarkId = Number(req.params.id);
@@ -931,8 +1177,8 @@ app.delete('/api/bookmarks/:id', (req, res) => {
 
     const result = db.prepare(`
       DELETE FROM bookmarks
-      WHERE id = ?
-    `).run(bookmarkId);
+      WHERE id = ? AND student_id = ?
+    `).run(bookmarkId, req.student.id);
 
     if (result.changes === 0) {
       return res.status(404).json({
@@ -952,14 +1198,16 @@ app.delete('/api/bookmarks/:id', (req, res) => {
   }
 });
 
-// Get all notes
+
+// Get notes belonging to the logged-in student
 app.get('/api/notes', (req, res) => {
   try {
     const notes = db.prepare(`
       SELECT *
       FROM notes
+      WHERE student_id = ?
       ORDER BY updated_at DESC, id DESC
-    `).all();
+    `).all(req.student.id);
 
     res.json(notes);
   } catch (error) {
@@ -971,12 +1219,12 @@ app.get('/api/notes', (req, res) => {
   }
 });
 
-// Create a new note
+// Create a note for the logged-in student
 app.post('/api/notes', (req, res) => {
   try {
     const { title, subject, content } = req.body;
 
-    if (!title || !title.trim()) {
+    if (typeof title !== 'string' || !title.trim()) {
       return res.status(400).json({
         message: 'Note title is required',
       });
@@ -988,14 +1236,27 @@ app.post('/api/notes', (req, res) => {
       });
     }
 
+    if (content !== undefined && typeof content !== 'string') {
+      return res.status(400).json({
+        message: 'Invalid note content',
+      });
+    }
+
     const result = db.prepare(`
-      INSERT INTO notes (title, subject, content)
-      VALUES (?, ?, ?)
-    `).run(title.trim(), subject, content || '');
+      INSERT INTO notes (student_id, title, subject, content)
+      VALUES (?, ?, ?, ?)
+    `).run(
+      req.student.id,
+      title.trim(),
+      subject,
+      content || ''
+    );
 
     const note = db.prepare(`
-      SELECT * FROM notes WHERE id = ?
-    `).get(result.lastInsertRowid);
+      SELECT *
+      FROM notes
+      WHERE id = ? AND student_id = ?
+    `).get(Number(result.lastInsertRowid), req.student.id);
 
     res.status(201).json(note);
   } catch (error) {
@@ -1007,7 +1268,7 @@ app.post('/api/notes', (req, res) => {
   }
 });
 
-// Update an existing note
+// Update a note belonging to the logged-in student
 app.put('/api/notes/:id', (req, res) => {
   try {
     const { title, subject, content } = req.body;
@@ -1019,7 +1280,7 @@ app.put('/api/notes/:id', (req, res) => {
       });
     }
 
-    if (!title || !title.trim()) {
+    if (typeof title !== 'string' || !title.trim()) {
       return res.status(400).json({
         message: 'Note title is required',
       });
@@ -1031,14 +1292,26 @@ app.put('/api/notes/:id', (req, res) => {
       });
     }
 
+    if (content !== undefined && typeof content !== 'string') {
+      return res.status(400).json({
+        message: 'Invalid note content',
+      });
+    }
+
     const result = db.prepare(`
       UPDATE notes
       SET title = ?,
           subject = ?,
           content = ?,
           updated_at = CURRENT_TIMESTAMP
-      WHERE id = ?
-    `).run(title.trim(), subject, content || '', noteId);
+      WHERE id = ? AND student_id = ?
+    `).run(
+      title.trim(),
+      subject,
+      content || '',
+      noteId,
+      req.student.id
+    );
 
     if (result.changes === 0) {
       return res.status(404).json({
@@ -1047,8 +1320,10 @@ app.put('/api/notes/:id', (req, res) => {
     }
 
     const updatedNote = db.prepare(`
-      SELECT * FROM notes WHERE id = ?
-    `).get(noteId);
+      SELECT *
+      FROM notes
+      WHERE id = ? AND student_id = ?
+    `).get(noteId, req.student.id);
 
     res.json(updatedNote);
   } catch (error) {
@@ -1060,7 +1335,7 @@ app.put('/api/notes/:id', (req, res) => {
   }
 });
 
-// Delete a note
+// Delete a note belonging to the logged-in student
 app.delete('/api/notes/:id', (req, res) => {
   try {
     const noteId = Number(req.params.id);
@@ -1073,8 +1348,8 @@ app.delete('/api/notes/:id', (req, res) => {
 
     const result = db.prepare(`
       DELETE FROM notes
-      WHERE id = ?
-    `).run(noteId);
+      WHERE id = ? AND student_id = ?
+    `).run(noteId, req.student.id);
 
     if (result.changes === 0) {
       return res.status(404).json({
@@ -1098,7 +1373,7 @@ app.delete('/api/notes/:id', (req, res) => {
 app.post('/api/pomodoro-sessions', (req, res) => {
   const { subject, duration_minutes } = req.body;
 
-  if (!['Java', 'DSA', 'Aptitude'].includes(subject)) {
+  if (!allowedSubjects.includes(subject)) {
     return res.status(400).json({
       message: 'Invalid subject'
     });
@@ -1115,15 +1390,20 @@ app.post('/api/pomodoro-sessions', (req, res) => {
   }
 
   const result = db.prepare(`
-    INSERT INTO pomodoro_sessions (subject, duration_minutes)
-    VALUES (?, ?)
-  `).run(subject, duration_minutes);
+    INSERT INTO pomodoro_sessions
+      (student_id, subject, duration_minutes)
+    VALUES (?, ?, ?)
+  `).run(
+    req.student.id,
+    subject,
+    duration_minutes
+  );
 
   const session = db.prepare(`
     SELECT *
     FROM pomodoro_sessions
-    WHERE id = ?
-  `).get(result.lastInsertRowid);
+    WHERE id = ? AND student_id = ?
+  `).get(Number(result.lastInsertRowid), req.student.id);
 
   res.status(201).json({
     message: 'Pomodoro session saved successfully',
@@ -1135,17 +1415,20 @@ app.post('/api/pomodoro-sessions', (req, res) => {
 // Get study streak statistics
 app.get('/api/study-streak', (req, res) => {
   try {
-    const studyDates = db.prepare(`
-      SELECT DISTINCT study_date AS study_date
-      FROM study_sessions
-      WHERE completed = 1
+   const studyDates = db.prepare(`
+  SELECT DISTINCT study_date AS study_date
+  FROM study_sessions
+  WHERE completed = 1
+    AND student_id = ?
 
-      UNION
+  UNION
 
-      SELECT DISTINCT
-        date(completed_at, '+5 hours', '+30 minutes') AS study_date
-      FROM pomodoro_sessions
-    `).all().map((row) => row.study_date);
+  SELECT DISTINCT
+    date(completed_at, '+5 hours', '+30 minutes') AS study_date
+  FROM pomodoro_sessions
+  WHERE student_id = ?
+`).all(req.student.id, req.student.id)
+  .map((row) => row.study_date);
 
     const dates = [...new Set(studyDates)].sort();
 
@@ -1207,12 +1490,26 @@ app.get('/api/study-streak', (req, res) => {
   return app;
 }
 
-function startServer({ databasePath = path.join(__dirname, 'preptrack.db'), port = 5000, DatabaseClass } = {}) {
-  let db;
+function startServer({
+  databasePath = path.join(__dirname, 'preptrack.db'),
+  port = 5000,
+  DatabaseClass,
+  sessionSecret = process.env.SESSION_SECRET,
+  rateLimitSecret = process.env.RATE_LIMIT_SECRET,
+  appOrigin = process.env.APP_ORIGIN,
+  env = process.env,
+} = {}) {
+let db;
   try {
     const Database = DatabaseClass || require('better-sqlite3');
     db = new Database(databasePath);
-    const app = createApp({ db });
+const app = createApp({
+  db,
+  sessionSecret,
+  rateLimitSecret,
+  appOrigin,
+  env,
+});
     const server = app.listen(port, () => {
       console.log(`PrepTrack server running on http://localhost:${port}`);
     });
@@ -1243,6 +1540,18 @@ console.error(`${message}: ${error.message}`);
   }
 }
 
-if (require.main === module) startServer();
+if (require.main === module) {
+  const envPath = path.resolve(__dirname, '..', '.env');
+
+  try {
+    process.loadEnvFile(envPath);
+  } catch (error) {
+    if (error.code !== 'ENOENT') {
+      throw error;
+    }
+  }
+
+  startServer();
+}
 
 module.exports = { createApp, startServer };

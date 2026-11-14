@@ -48,6 +48,63 @@ function createDatabase() {
       student_id INTEGER REFERENCES students(id)
     );
 
+
+        CREATE TABLE roadmap (
+      id INTEGER PRIMARY KEY,
+      title TEXT NOT NULL,
+      status TEXT NOT NULL DEFAULT 'Not Started'
+    );
+
+    CREATE TABLE java_topics (
+      id INTEGER PRIMARY KEY,
+      title TEXT NOT NULL,
+      status TEXT NOT NULL DEFAULT 'Not Started'
+    );
+
+    CREATE TABLE dsa_topics (
+      id INTEGER PRIMARY KEY,
+      title TEXT NOT NULL,
+      status TEXT NOT NULL DEFAULT 'Not Started'
+    );
+
+    CREATE TABLE aptitude_topics (
+      id INTEGER PRIMARY KEY,
+      title TEXT NOT NULL,
+      status TEXT NOT NULL DEFAULT 'Not Started'
+    );
+
+    CREATE TABLE roadmap_progress (
+      student_id INTEGER NOT NULL REFERENCES students(id),
+      roadmap_id INTEGER NOT NULL REFERENCES roadmap(id),
+      status TEXT NOT NULL DEFAULT 'Not Started',
+      updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      PRIMARY KEY (student_id, roadmap_id)
+    );
+
+    CREATE TABLE java_topic_progress (
+      student_id INTEGER NOT NULL REFERENCES students(id),
+      topic_id INTEGER NOT NULL REFERENCES java_topics(id),
+      status TEXT NOT NULL DEFAULT 'Not Started',
+      updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      PRIMARY KEY (student_id, topic_id)
+    );
+
+    CREATE TABLE dsa_topic_progress (
+      student_id INTEGER NOT NULL REFERENCES students(id),
+      topic_id INTEGER NOT NULL REFERENCES dsa_topics(id),
+      status TEXT NOT NULL DEFAULT 'Not Started',
+      updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      PRIMARY KEY (student_id, topic_id)
+    );
+
+    CREATE TABLE aptitude_topic_progress (
+      student_id INTEGER NOT NULL REFERENCES students(id),
+      topic_id INTEGER NOT NULL REFERENCES aptitude_topics(id),
+      status TEXT NOT NULL DEFAULT 'Not Started',
+      updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      PRIMARY KEY (student_id, topic_id)
+    );
+
     CREATE TABLE bootstrap_state (
       singleton INTEGER PRIMARY KEY CHECK(singleton = 1),
       owner_student_id INTEGER NOT NULL UNIQUE
@@ -96,6 +153,10 @@ test('first student receives all unassigned legacy records', () => {
       studySessionsTransferred: 2,
       pomodoroTransferred: 5,
       notesTransferred: 3,
+      roadmapProgressTransferred: 0,
+      javaProgressTransferred: 0,
+      dsaProgressTransferred: 0,
+      aptitudeProgressTransferred: 0,
       bookmarksTransferred: 4
     });
 
@@ -116,6 +177,66 @@ test('first student receives all unassigned legacy records', () => {
   }
 });
 
+test('first student receives legacy roadmap and topic progress', () => {
+  const db = createDatabase();
+
+  try {
+    const studentId = createStudent(db, 'progress@test.com');
+
+    const legacyData = [
+      ['roadmap', 'title', 'Java Roadmap', 'Completed'],
+      ['roadmap', 'title', 'DSA Roadmap', 'In Progress'],
+      ['java_topics', 'title', 'Java Basics', 'Completed'],
+      ['java_topics', 'title', 'OOP', 'In Progress'],
+      ['dsa_topics', 'title', 'Arrays', 'Completed'],
+      ['dsa_topics', 'title', 'Linked Lists', 'In Progress'],
+      ['aptitude_topics', 'title', 'Percentages', 'Completed']
+    ];
+
+    for (const [table, column, title, status] of legacyData) {
+      db.prepare(
+        `INSERT INTO ${table} (${column}, status) VALUES (?, ?)`
+      ).run(title, status);
+    }
+
+    const result = bootstrapFirstStudent(db, studentId);
+
+    assert.deepEqual(result, {
+      bootstrapped: true,
+      tasksTransferred: 0,
+      studySessionsTransferred: 0,
+      pomodoroTransferred: 0,
+      notesTransferred: 0,
+      roadmapProgressTransferred: 2,
+      javaProgressTransferred: 2,
+      dsaProgressTransferred: 2,
+      aptitudeProgressTransferred: 1,
+      bookmarksTransferred: 0
+    });
+
+    const expectedProgress = [
+      ['roadmap_progress', 'roadmap_id', 1, 'Completed'],
+      ['roadmap_progress', 'roadmap_id', 2, 'In Progress'],
+      ['java_topic_progress', 'topic_id', 1, 'Completed'],
+      ['java_topic_progress', 'topic_id', 2, 'In Progress'],
+      ['dsa_topic_progress', 'topic_id', 1, 'Completed'],
+      ['dsa_topic_progress', 'topic_id', 2, 'In Progress'],
+      ['aptitude_topic_progress', 'topic_id', 1, 'Completed']
+    ];
+
+    for (const [table, idColumn, id, expectedStatus] of expectedProgress) {
+      const row = db.prepare(
+        `SELECT status FROM ${table}
+         WHERE student_id = ? AND ${idColumn} = ?`
+      ).get(studentId, id);
+
+      assert.ok(row, `${table} record ${id} should exist`);
+      assert.equal(row.status, expectedStatus);
+    }
+  } finally {
+    db.close();
+  }
+});
 
 test('second student cannot claim legacy records', () => {
   const db = createDatabase();

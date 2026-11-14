@@ -46,7 +46,7 @@ class SQLiteSessionStore extends session.Store {
     })) positiveTimestamp(value, key);
 
     this.read = db.prepare('SELECT sid, student_id, session_data, created_at_ms, expires_at_ms FROM sessions WHERE sid = ?');
-    this.readRevocation = db.prepare('SELECT retain_until_ms FROM session_revocations WHERE sid_hash = ?');
+this.readRevocation = db.prepare('SELECT retain_until_ms FROM session_revocations WHERE sid_hash = ?');
     this.removeOne = db.prepare('DELETE FROM sessions WHERE sid = ?');
     this.removeExpiredSessions = db.prepare('SELECT sid, created_at_ms FROM sessions WHERE expires_at_ms <= ? OR created_at_ms + ? <= ?');
     this.removeExpiredRevocations = db.prepare('DELETE FROM session_revocations WHERE retain_until_ms <= ?');
@@ -194,10 +194,14 @@ class SQLiteSessionStore extends session.Store {
         }
         if (!provenance || provenance.sid !== sid) return { error: sessionError('Session provenance is missing or belongs to another SID.') };
 
-        let createdAtMs;
+                let createdAtMs;
         if (row) {
           if (provenance.kind !== 'loaded' || provenance.createdAtMs !== row.created_at_ms) {
             return { error: sessionError('Loaded session provenance no longer matches the database row.') };
+          }
+
+          if (row.student_id !== studentId) {
+            return { error: sessionError('Session student ownership cannot be changed.') };
           }
           createdAtMs = row.created_at_ms;
         } else {
@@ -257,6 +261,13 @@ class SQLiteSessionStore extends session.Store {
         if (!provenance || provenance.kind !== 'loaded' || provenance.sid !== sid || provenance.createdAtMs !== row.created_at_ms) {
           return sessionError('Session provenance is missing or belongs to another SID.');
         }
+        const studentId = sess.studentId == null ? null : sess.studentId;
+
+if (row.student_id !== studentId) {
+  return sessionError('Session student ownership cannot be changed.');
+}
+
+
         if (row.expires_at_ms <= now || safeAdd(row.created_at_ms, this.absoluteTimeoutMs, 'absolute session expiry') <= now) {
           this.expireRow(row, now);
           return sessionError('Session has expired.');

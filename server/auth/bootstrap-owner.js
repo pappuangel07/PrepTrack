@@ -47,6 +47,46 @@ function bootstrapFirstStudent(db, studentId) {
       'UPDATE bookmarks SET student_id = ? WHERE student_id IS NULL'
     ).run(studentId);
 
+    // Transfer legacy roadmap progress to the first student.
+    const roadmapProgress = db.prepare(`
+      INSERT INTO roadmap_progress
+        (student_id, roadmap_id, status, updated_at)
+      SELECT ?, id, status, CURRENT_TIMESTAMP
+      FROM roadmap
+      WHERE status != 'Not Started'
+      ON CONFLICT(student_id, roadmap_id) DO NOTHING
+    `).run(studentId);
+
+    // Transfer legacy Java topic progress.
+    const javaProgress = db.prepare(`
+      INSERT INTO java_topic_progress
+        (student_id, topic_id, status, updated_at)
+      SELECT ?, id, status, CURRENT_TIMESTAMP
+      FROM java_topics
+      WHERE status != 'Not Started'
+      ON CONFLICT(student_id, topic_id) DO NOTHING
+    `).run(studentId);
+
+    // Transfer legacy DSA topic progress.
+    const dsaProgress = db.prepare(`
+      INSERT INTO dsa_topic_progress
+        (student_id, topic_id, status, updated_at)
+      SELECT ?, id, status, CURRENT_TIMESTAMP
+      FROM dsa_topics
+      WHERE status != 'Not Started'
+      ON CONFLICT(student_id, topic_id) DO NOTHING
+    `).run(studentId);
+
+    // Transfer legacy aptitude topic progress.
+    const aptitudeProgress = db.prepare(`
+      INSERT INTO aptitude_topic_progress
+        (student_id, topic_id, status, updated_at)
+      SELECT ?, id, status, CURRENT_TIMESTAMP
+      FROM aptitude_topics
+      WHERE status != 'Not Started'
+      ON CONFLICT(student_id, topic_id) DO NOTHING
+    `).run(studentId);
+
     db.prepare(
       'INSERT INTO bootstrap_state (singleton, owner_student_id) VALUES (1, ?)'
     ).run(studentId);
@@ -57,6 +97,10 @@ function bootstrapFirstStudent(db, studentId) {
       studySessionsTransferred: studySessions.changes,
       pomodoroTransferred: pomodoro.changes,
       notesTransferred: notes.changes,
+      roadmapProgressTransferred: roadmapProgress.changes,
+      javaProgressTransferred: javaProgress.changes,
+      dsaProgressTransferred: dsaProgress.changes,
+      aptitudeProgressTransferred: aptitudeProgress.changes,
       bookmarksTransferred: bookmarks.changes
     };
   });
