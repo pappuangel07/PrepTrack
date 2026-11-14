@@ -9,6 +9,7 @@ build/
 # Environment variables and secrets
 .env
 .env.*
+!.env.example
 
 # SQLite database
 server/preptrack.db
@@ -26,3 +27,12 @@ node_modules/
 # Temporary database inspection
 check-db.cjs
 server/preptrack-backup-new.db
+
+# Temporary migration and rehearsal artifacts
+/server/.phase2-migration-*/
+/server/phase1-rehearsal-*/
+/server/preptrack-bootstrap-*.db
+/server/preptrack-step1-disposable-*.db
+
+# Local API review
+/frontend-api-audit.txt
