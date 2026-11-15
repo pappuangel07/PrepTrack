@@ -11,6 +11,9 @@ const ARGON2_OPTIONS = Object.freeze({
   hashLength: 32,
 });
 
+const DUMMY_PASSWORD_HASH =
+  '$argon2id$v=19$m=19456,t=2,p=1$9qZ91qH0OUHi361eA0pkqA$mJp4tCePwGrHP3CjzboYXKxaK1MH4w2CWnHMRPaKAaY';
+
 function validatePassword(password) {
   if (typeof password !== 'string') throw new TypeError('Password must be a string.');
   const bytes = Buffer.byteLength(password, 'utf8');
@@ -36,3 +39,12 @@ async function verifyPassword(encodedHash, password) {
 }
 
 module.exports = { ARGON2_OPTIONS, PASSWORD_POLICY, hashPassword, validatePassword, verifyPassword };
+
+module.exports = {
+  ARGON2_OPTIONS,
+  DUMMY_PASSWORD_HASH,
+  PASSWORD_POLICY,
+  hashPassword,
+  validatePassword,
+  verifyPassword,
+};

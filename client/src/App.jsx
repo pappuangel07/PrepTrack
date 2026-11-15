@@ -529,9 +529,9 @@ const taskProgressPercentage =
   tasks.length === 0
     ? 0
     : Math.round((completedTasks / tasks.length) * 100);
-    
+
 const completedCount = roadmap.filter(
-  
+
   (item) => item.status === 'Completed'
 ).length;
 
@@ -560,9 +560,55 @@ const overdueTasks = tasks.filter(
     task.due_date < new Date().toLocaleDateString('en-CA')
 ).length;
 
-  return (
-    <div className="app">
+
+return (
+  <div className="app">
+    <aside className="sidebar">
+      <div className="sidebar-brand">
+        <span className="sidebar-logo">P</span>
+        <span>PrepTrack</span>
+      </div>
+
+      <nav className="sidebar-nav" aria-label="Main navigation">
+        <p className="nav-heading">MENU</p>
+
+        {[
+          { id: 'dashboard', label: 'Dashboard', icon: '⌂' },
+          { id: 'java', label: 'Java', icon: 'J' },
+          { id: 'dsa', label: 'DSA', icon: '⌘' },
+          { id: 'aptitude', label: 'Aptitude', icon: '◈' },
+          { id: 'planner', label: 'Study Planner', icon: '▤' },
+          { id: 'pomodoro', label: 'Pomodoro', icon: '◷' },
+          { id: 'streak', label: 'Study Streak', icon: '↗' },
+          { id: 'notes', label: 'Notes', icon: '▧' },
+          { id: 'bookmarks', label: 'Bookmarks', icon: '☆' },
+        ].map((item) => (
+          <button
+            key={item.id}
+            type="button"
+            className={`sidebar-link ${
+              activePage === item.id ? 'active' : ''
+            }`}
+            aria-current={activePage === item.id ? 'page' : undefined}
+            onClick={() => setActivePage(item.id)}
+          >
+            <span className="sidebar-icon" aria-hidden="true">
+              {item.icon}
+            </span>
+            <span>{item.label}</span>
+          </button>
+        ))}
+      </nav>
+
+      <div className="sidebar-footer">
+        <span>Placement preparation</span>
+        <small>Keep learning. Keep growing.</small>
+      </div>
+    </aside>
+
+    <div className="app-content">
       <header className="header">
+
         <h1>PrepTrack</h1>
         <p>Your placement preparation journey starts here.</p>
       </header>
@@ -608,7 +654,7 @@ const overdueTasks = tasks.filter(
 
     <StudyStreak />
   </>
-  
+
 ) : activePage === 'notes' ? (
   <NotesManager goToDashboard={goToDashboard} />
 
@@ -736,7 +782,7 @@ const overdueTasks = tasks.filter(
     : ''
 }`}
   key={item.id}
-  
+
 
 onClick={() => {
   if (item.title === 'Java') {
@@ -1172,6 +1218,7 @@ onClick={() => {
         </>
    )}
       </main>
+    </div>
     </div>
   );
 }

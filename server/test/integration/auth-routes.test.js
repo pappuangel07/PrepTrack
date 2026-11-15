@@ -1,6 +1,7 @@
 
 'use strict';
 
+const Database = require('better-sqlite3');
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const http = require('node:http');
@@ -787,6 +788,135 @@ test('students cannot access or modify another student tasks', async (t) => {
 });
 
 
+
+test('students cannot access or modify another student study sessions', async (t) => {
+  const fixture = createTestApp(
+    path.join(tempRoot, 'student-study-session-isolation.db')
+  );
+
+  t.after(() => fixture.db.close());
+
+  const server = await startTestServer(fixture.app);
+
+  t.after(() => new Promise((resolve) => {
+    server.close(resolve);
+  }));
+
+  async function registerStudent(name, email) {
+    const csrfResponse = await sendRequest(server, {
+      method: 'GET',
+      pathname: '/api/csrf-token',
+    });
+
+    assert.equal(csrfResponse.status, 200);
+
+    const registrationResponse = await sendRequest(server, {
+      method: 'POST',
+      pathname: '/api/auth/register',
+      headers: {
+        Origin: 'http://localhost:5173',
+        'x-csrf-token': csrfResponse.body.csrfToken,
+      },
+      cookie: cookieHeader(csrfResponse),
+      body: {
+        name,
+        email,
+        password: 'StrongPassword123!',
+      },
+    });
+
+    assert.equal(registrationResponse.status, 201);
+
+    return {
+      cookie: cookieHeader(registrationResponse),
+      csrfToken: registrationResponse.body.csrfToken,
+    };
+  }
+
+  const studentA = await registerStudent(
+    'Student A',
+    'study-session-a@example.com'
+  );
+
+  const studentB = await registerStudent(
+    'Student B',
+    'study-session-b@example.com'
+  );
+
+  // Student A creates a study session.
+  const createResponse = await sendRequest(server, {
+    method: 'POST',
+    pathname: '/api/study-sessions',
+    headers: {
+      Origin: 'http://localhost:5173',
+      'x-csrf-token': studentA.csrfToken,
+    },
+    cookie: studentA.cookie,
+    body: {
+      subject: 'Java',
+      topic: 'OOP concepts',
+      study_date: '2026-11-14',
+      start_time: '10:00',
+      duration_minutes: 45,
+    },
+  });
+
+  assert.equal(createResponse.status, 201);
+  assert.equal(createResponse.body.session.topic, 'OOP concepts');
+
+  const sessionId = createResponse.body.session.id;
+
+  // Student B must not see Student A's study session.
+  const studentBSessions = await sendRequest(server, {
+    pathname: '/api/study-sessions',
+    cookie: studentB.cookie,
+  });
+
+  assert.equal(studentBSessions.status, 200);
+  assert.deepEqual(studentBSessions.body, []);
+
+  // Student B must not update Student A's study session.
+  const updateResponse = await sendRequest(server, {
+    method: 'PATCH',
+    pathname: `/api/study-sessions/${sessionId}`,
+    headers: {
+      Origin: 'http://localhost:5173',
+      'x-csrf-token': studentB.csrfToken,
+    },
+    cookie: studentB.cookie,
+    body: {
+      topic: 'Modified by Student B',
+    },
+  });
+
+  assert.equal(updateResponse.status, 404);
+
+  // Student B must not delete Student A's study session.
+  const deleteResponse = await sendRequest(server, {
+    method: 'DELETE',
+    pathname: `/api/study-sessions/${sessionId}`,
+    headers: {
+      Origin: 'http://localhost:5173',
+      'x-csrf-token': studentB.csrfToken,
+    },
+    cookie: studentB.cookie,
+  });
+
+  assert.equal(deleteResponse.status, 404);
+
+  // Student A must still see the original, unchanged study session.
+  const studentASessions = await sendRequest(server, {
+    pathname: '/api/study-sessions',
+    cookie: studentA.cookie,
+  });
+
+  assert.equal(studentASessions.status, 200);
+  assert.equal(studentASessions.body.length, 1);
+  assert.equal(studentASessions.body[0].id, sessionId);
+  assert.equal(studentASessions.body[0].topic, 'OOP concepts');
+});
+
+
 test('students have isolated roadmap and topic progress', async (t) => {
   const fixture = createTestApp(
     path.join(tempRoot, 'student-progress-isolation.db')
@@ -919,4 +1049,508 @@ test('students have isolated roadmap and topic progress', async (t) => {
       `${table} base status must not be changed`
     );
   }
+});
+
+
+test('registration rolls back student creation when bootstrap fails', async (t) => {
+  const fixture = createTestApp(
+    path.join(tempRoot, 'registration-bootstrap-rollback.db')
+  );
+
+  t.after(() => fixture.db.close());
+
+  const server = await startTestServer(fixture.app);
+  t.after(() => new Promise((resolve) => {
+    server.close(resolve);
+  }));
+
+  // Inject a failure at the final bootstrap step.
+  // This is added after app startup so schema readiness is unaffected.
+  fixture.db.exec(`
+    CREATE TRIGGER fail_bootstrap_marker
+    BEFORE INSERT ON bootstrap_state
+    BEGIN
+      SELECT RAISE(ABORT, 'Injected bootstrap failure');
+    END;
+  `);
+
+  const csrfResponse = await sendRequest(server, {
+    method: 'GET',
+    pathname: '/api/csrf-token',
+  });
+
+  assert.equal(csrfResponse.status, 200);
+
+  const response = await sendRequest(server, {
+    method: 'POST',
+    pathname: '/api/auth/register',
+    headers: {
+      Origin: 'http://localhost:5173',
+      'x-csrf-token': csrfResponse.body.csrfToken,
+    },
+    cookie: cookieHeader(csrfResponse),
+    body: {
+      name: 'Rollback Student',
+      email: 'rollback@example.com',
+      password: 'StrongPassword123!',
+    },
+  });
+
+  assert.equal(response.status, 500);
+
+  const studentCount = fixture.db.prepare(
+    'SELECT COUNT(*) AS total FROM students'
+  ).get().total;
+
+  const bootstrapCount = fixture.db.prepare(
+    'SELECT COUNT(*) AS total FROM bootstrap_state'
+  ).get().total;
+
+  assert.equal(studentCount, 0, 'student insertion must roll back');
+  assert.equal(bootstrapCount, 0, 'bootstrap marker must not remain');
+});
+
+
+test('concurrent registrations assign legacy data to exactly one first student', async (t) => {
+  const filename = path.join(tempRoot, 'registration-concurrent.db');
+
+  // Two independent SQLite connections to the same database.
+  const first = createTestApp(filename);
+  const secondDb = new Database(filename);
+
+  const secondApp = createApp({
+    db: secondDb,
+    sessionSecret: 's'.repeat(48),
+    rateLimitSecret: 'r'.repeat(48),
+    appOrigin: 'http://localhost:5173',
+    env: { NODE_ENV: 'test' },
+  });
+
+  t.after(() => {
+    first.db.close();
+    secondDb.close();
+  });
+
+  // Simulate data created before the first student registers.
+  first.db.prepare(`
+    INSERT INTO tasks (title, description)
+    VALUES ('Legacy task', 'Must belong to the first student')
+  `).run();
+
+  const firstServer = await startTestServer(first.app);
+  const secondServer = await startTestServer(secondApp);
+
+  t.after(() => Promise.all([
+    new Promise((resolve) => firstServer.close(resolve)),
+    new Promise((resolve) => secondServer.close(resolve)),
+  ]));
+
+  // Give each independent browser session its own CSRF token.
+  const [firstCsrf, secondCsrf] = await Promise.all([
+    sendRequest(firstServer, {
+      method: 'GET',
+      pathname: '/api/csrf-token',
+    }),
+    sendRequest(secondServer, {
+      method: 'GET',
+      pathname: '/api/csrf-token',
+    }),
+  ]);
+
+  assert.equal(firstCsrf.status, 200);
+  assert.equal(secondCsrf.status, 200);
+
+  // Start both registrations concurrently.
+  const [firstResponse, secondResponse] = await Promise.all([
+    sendRequest(firstServer, {
+      method: 'POST',
+      pathname: '/api/auth/register',
+      headers: {
+        Origin: 'http://localhost:5173',
+        'x-csrf-token': firstCsrf.body.csrfToken,
+      },
+      cookie: cookieHeader(firstCsrf),
+      body: {
+        name: 'First Concurrent Student',
+        email: 'first-concurrent@example.com',
+        password: 'StrongPassword123!',
+      },
+    }),
+    sendRequest(secondServer, {
+      method: 'POST',
+      pathname: '/api/auth/register',
+      headers: {
+        Origin: 'http://localhost:5173',
+        'x-csrf-token': secondCsrf.body.csrfToken,
+      },
+      cookie: cookieHeader(secondCsrf),
+      body: {
+        name: 'Second Concurrent Student',
+        email: 'second-concurrent@example.com',
+        password: 'StrongPassword123!',
+      },
+    }),
+  ]);
+
+  assert.equal(firstResponse.status, 201);
+  assert.equal(secondResponse.status, 201);
+
+  const students = first.db.prepare(
+    'SELECT id FROM students ORDER BY id'
+  ).all();
+
+  assert.equal(students.length, 2);
+
+  const bootstrap = first.db.prepare(`
+    SELECT owner_student_id
+    FROM bootstrap_state
+    WHERE singleton = 1
+  `).get();
+
+  assert.ok(bootstrap, 'bootstrap marker must exist');
+
+  const studentIds = students.map((student) => student.id);
+
+  assert.ok(
+    studentIds.includes(bootstrap.owner_student_id),
+    'bootstrap owner must be one of the registered students'
+  );
+
+  const legacyTask = first.db.prepare(`
+    SELECT student_id
+    FROM tasks
+    WHERE title = 'Legacy task'
+  `).get();
+
+  assert.equal(
+    legacyTask.student_id,
+    bootstrap.owner_student_id,
+    'legacy task must belong to the bootstrap owner'
+  );
+
+  const unassignedTasks = first.db.prepare(
+    'SELECT COUNT(*) AS total FROM tasks WHERE student_id IS NULL'
+  ).get().total;
+
+  assert.equal(unassignedTasks, 0);
+});
+
+
+test('login, me, and logout complete the authentication lifecycle', async (t) => {
+  const fixture = createTestApp(
+    path.join(tempRoot, 'auth-lifecycle.db')
+  );
+
+  t.after(() => fixture.db.close());
+
+  const server = await startTestServer(fixture.app);
+
+  t.after(() => new Promise((resolve) => {
+    server.close(resolve);
+  }));
+
+  const credentials = {
+    name: 'Lifecycle Student',
+    email: 'lifecycle@example.com',
+    password: 'StrongPassword123!',
+  };
+
+  // Register the student to create an account.
+  const registrationCsrf = await sendRequest(server, {
+    method: 'GET',
+    pathname: '/api/csrf-token',
+  });
+
+  assert.equal(registrationCsrf.status, 200);
+
+  const registration = await sendRequest(server, {
+    method: 'POST',
+    pathname: '/api/auth/register',
+    headers: {
+      Origin: 'http://localhost:5173',
+      'x-csrf-token': registrationCsrf.body.csrfToken,
+    },
+    cookie: cookieHeader(registrationCsrf),
+    body: credentials,
+  });
+
+  assert.equal(registration.status, 201);
+
+  // Start a separate anonymous browser session for login.
+  const loginCsrf = await sendRequest(server, {
+    method: 'GET',
+    pathname: '/api/csrf-token',
+  });
+
+  assert.equal(loginCsrf.status, 200);
+
+  const anonymousCookie = cookieHeader(loginCsrf);
+
+  // Log in with the registered credentials.
+  const login = await sendRequest(server, {
+    method: 'POST',
+    pathname: '/api/auth/login',
+    headers: {
+      Origin: 'http://localhost:5173',
+      'x-csrf-token': loginCsrf.body.csrfToken,
+    },
+    cookie: anonymousCookie,
+    body: {
+      email: credentials.email,
+      password: credentials.password,
+    },
+  });
+
+  assert.equal(login.status, 200);
+  assert.equal(login.body.student.email, credentials.email);
+  assert.equal(login.body.student.name, credentials.name);
+  assert.equal(typeof login.body.csrfToken, 'string');
+  assert.notEqual(
+    cookieHeader(login),
+    anonymousCookie,
+    'login must regenerate the session cookie'
+  );
+
+  assert.equal('password' in login.body.student, false);
+  assert.equal('password_hash' in login.body.student, false);
+
+  const authenticatedCookie = cookieHeader(login);
+
+  // Verify the authenticated user's profile.
+  const me = await sendRequest(server, {
+    pathname: '/api/auth/me',
+    cookie: authenticatedCookie,
+  });
+
+  assert.equal(me.status, 200);
+  assert.deepEqual(me.body.student, login.body.student);
+
+  // Log out using the authenticated session and its fresh CSRF token.
+  const logout = await sendRequest(server, {
+    method: 'POST',
+    pathname: '/api/auth/logout',
+    headers: {
+      Origin: 'http://localhost:5173',
+      'x-csrf-token': login.body.csrfToken,
+    },
+    cookie: authenticatedCookie,
+  });
+
+  assert.equal(logout.status, 200);
+  assert.equal(logout.body.message, 'Logged out.');
+
+  // The old authenticated session must no longer work.
+  const meAfterLogout = await sendRequest(server, {
+    pathname: '/api/auth/me',
+    cookie: authenticatedCookie,
+  });
+
+  assert.equal(meAfterLogout.status, 401);
+});
+
+
+test('failed login gives identical errors and does not authenticate the session', async (t) => {
+  const fixture = createTestApp(
+    path.join(tempRoot, 'failed-login.db')
+  );
+
+  t.after(() => fixture.db.close());
+
+  const server = await startTestServer(fixture.app);
+
+  t.after(() => new Promise((resolve) => {
+    server.close(resolve);
+  }));
+
+  const csrf = await sendRequest(server, {
+    method: 'GET',
+    pathname: '/api/csrf-token',
+  });
+
+  assert.equal(csrf.status, 200);
+
+  const cookie = cookieHeader(csrf);
+
+  // Create a real account first.
+  const registration = await sendRequest(server, {
+    method: 'POST',
+    pathname: '/api/auth/register',
+    headers: {
+      Origin: 'http://localhost:5173',
+      'x-csrf-token': csrf.body.csrfToken,
+    },
+    cookie,
+    body: {
+      name: 'Failed Login Student',
+      email: 'failed-login@example.com',
+      password: 'StrongPassword123!',
+    },
+  });
+
+  assert.equal(registration.status, 201);
+
+  // Use a fresh anonymous session for failed login attempts.
+  const loginCsrf = await sendRequest(server, {
+    method: 'GET',
+    pathname: '/api/csrf-token',
+  });
+
+  const loginCookie = cookieHeader(loginCsrf);
+
+  const headers = {
+    Origin: 'http://localhost:5173',
+    'x-csrf-token': loginCsrf.body.csrfToken,
+  };
+
+  // Existing email, incorrect password.
+  const wrongPassword = await sendRequest(server, {
+    method: 'POST',
+    pathname: '/api/auth/login',
+    headers,
+    cookie: loginCookie,
+    body: {
+      email: 'failed-login@example.com',
+      password: 'WrongPassword123!',
+    },
+  });
+
+  // Nonexistent email.
+  const unknownEmail = await sendRequest(server, {
+    method: 'POST',
+    pathname: '/api/auth/login',
+    headers,
+    cookie: loginCookie,
+    body: {
+      email: 'unknown-login@example.com',
+      password: 'StrongPassword123!',
+    },
+  });
+
+  assert.equal(wrongPassword.status, 401);
+  assert.equal(unknownEmail.status, 401);
+
+  assert.deepEqual(
+    wrongPassword.body,
+    unknownEmail.body,
+    'both failures must return identical responses'
+  );
+
+  // Neither failed attempt should authenticate the session.
+  const me = await sendRequest(server, {
+    pathname: '/api/auth/me',
+    cookie: loginCookie,
+  });
+
+  assert.equal(me.status, 401);
+});
+
+
+test('login endpoint enforces the per-email rate limit', async (t) => {
+  const fixture = createTestApp(
+    path.join(tempRoot, 'login-rate-limit.db')
+  );
+
+  const server = await startTestServer(fixture.app);
+
+  t.after(async () => {
+    await new Promise((resolve) => server.close(resolve));
+    fixture.db.close();
+  });
+
+  const csrf = await sendRequest(server, {
+    method: 'GET',
+    pathname: '/api/csrf-token',
+  });
+
+  const cookie = cookieHeader(csrf);
+
+  const headers = {
+    Origin: 'http://localhost:5173',
+    'x-csrf-token': csrf.body.csrfToken,
+  };
+
+  const statuses = [];
+
+  for (let attempt = 1; attempt <= 11; attempt += 1) {
+    const response = await sendRequest(server, {
+      method: 'POST',
+      pathname: '/api/auth/login',
+      headers,
+      cookie,
+      body: {
+        email: 'rate-limit@example.com',
+        password: 'WrongPassword123!',
+      },
+    });
+
+    statuses.push(response.status);
+  }
+
+  assert.deepEqual(
+    statuses,
+    [
+      401, 401, 401, 401, 401,
+      401, 401, 401, 401, 401,
+      429,
+    ]
+  );
+});
+
+
+test('logout rejects a request without a CSRF token', async (t) => {
+  const fixture = createTestApp(
+    path.join(tempRoot, 'logout-csrf.db')
+  );
+
+  const server = await startTestServer(fixture.app);
+
+  t.after(async () => {
+    await new Promise((resolve) => server.close(resolve));
+    fixture.db.close();
+  });
+
+  const csrf = await sendRequest(server, {
+    method: 'GET',
+    pathname: '/api/csrf-token',
+  });
+
+  assert.equal(csrf.status, 200);
+
+  const registration = await sendRequest(server, {
+    method: 'POST',
+    pathname: '/api/auth/register',
+    headers: {
+      Origin: 'http://localhost:5173',
+      'x-csrf-token': csrf.body.csrfToken,
+    },
+    cookie: cookieHeader(csrf),
+    body: {
+      name: 'Logout CSRF Student',
+      email: 'logout-csrf@example.com',
+      password: 'StrongPassword123!',
+    },
+  });
+
+  assert.equal(registration.status, 201);
+
+  const authenticatedCookie = cookieHeader(registration);
+
+  const rejectedLogout = await sendRequest(server, {
+    method: 'POST',
+    pathname: '/api/auth/logout',
+    headers: {
+      Origin: 'http://localhost:5173',
+    },
+    cookie: authenticatedCookie,
+  });
+
+  assert.equal(rejectedLogout.status, 403);
+
+  const me = await sendRequest(server, {
+    pathname: '/api/auth/me',
+    cookie: authenticatedCookie,
+  });
+
+  assert.equal(me.status, 200);
+  assert.equal(me.body.student.email, 'logout-csrf@example.com');
 });

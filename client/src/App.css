@@ -1,4 +1,3 @@
-
 * {
   box-sizing: border-box;
 }
@@ -562,7 +561,7 @@ body {
 
   .task-filters input,
   .task-filters select {
-    font-size: 14px;
+  font-size: 14px;
   }
 }
 
@@ -1670,5 +1669,205 @@ body {
 
   .bookmarks-filters {
     flex-direction: column;
+  }
+}
+
+
+/* ===== PREPTRACK APP SHELL ===== */
+
+body {
+  font-family: Inter, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+}
+
+.app {
+  display: flex;
+  min-height: 100vh;
+  background: #f5f7fb;
+}
+
+.sidebar {
+  width: 250px;
+  min-width: 250px;
+  height: 100vh;
+  position: sticky;
+  top: 0;
+  display: flex;
+  flex-direction: column;
+  padding: 26px 16px;
+  background: #111827;
+  color: #f8fafc;
+}
+
+.sidebar-brand {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 0 10px;
+  margin-bottom: 42px;
+  font-size: 21px;
+  font-weight: 750;
+  letter-spacing: -0.5px;
+}
+
+.sidebar-logo {
+  width: 38px;
+  height: 38px;
+  display: grid;
+  place-items: center;
+  border-radius: 11px;
+  background: #6366f1;
+  color: white;
+  font-size: 21px;
+  font-weight: 800;
+}
+
+.sidebar-nav {
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+}
+
+.nav-heading {
+  margin: 0 10px 12px;
+  color: #94a3b8;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 1.3px;
+}
+
+.sidebar-link {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  gap: 13px;
+  padding: 12px 13px;
+  border: 0;
+  border-radius: 9px;
+  background: transparent;
+  color: #cbd5e1;
+  text-align: left;
+  font-size: 14px;
+  font-weight: 500;
+  transition: background 0.2s ease, color 0.2s ease;
+}
+
+.sidebar-link:hover {
+  background: #263247;
+  color: #fff;
+}
+
+.sidebar-link.active {
+  background: #4f46e5;
+  color: #fff;
+  font-weight: 650;
+}
+
+.sidebar-icon {
+  width: 20px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 17px;
+}
+
+.sidebar-footer {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-top: auto;
+  padding: 16px 10px 4px;
+  border-top: 1px solid #334155;
+  color: #cbd5e1;
+  font-size: 12px;
+}
+
+.sidebar-footer small {
+  color: #94a3b8;
+  font-size: 11px;
+}
+
+.app-content {
+  flex: 1;
+  min-width: 0;
+}
+
+.app-content .header {
+  padding: 20px 32px;
+  background: #fff;
+  border-bottom: 1px solid #e5e7eb;
+}
+
+.app-content .main {
+  width: min(1200px, 100%);
+  margin: 0 auto;
+  padding: 32px;
+}
+
+/* ===== TABLET ===== */
+
+@media (max-width: 850px) {
+  .sidebar {
+    width: 210px;
+    min-width: 210px;
+    padding: 22px 12px;
+  }
+
+  .app-content .main {
+    padding: 24px 20px;
+  }
+
+  .app-content .header {
+    padding: 18px 20px;
+  }
+}
+
+/* ===== MOBILE ===== */
+
+@media (max-width: 600px) {
+  .app {
+    display: block;
+  }
+
+  .sidebar {
+    position: static;
+    width: 100%;
+    min-width: 0;
+    height: auto;
+    padding: 14px 14px 12px;
+  }
+
+  .sidebar-brand {
+    margin-bottom: 16px;
+    font-size: 19px;
+  }
+
+  .sidebar-nav {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 6px;
+  }
+
+  .nav-heading,
+  .sidebar-footer {
+    display: none;
+  }
+
+  .sidebar-link {
+    justify-content: center;
+    gap: 5px;
+    padding: 10px 5px;
+    font-size: 11px;
+  }
+
+  .sidebar-icon {
+    display: none;
+  }
+
+  .app-content .header {
+    padding: 18px 16px;
+  }
+
+  .app-content .main {
+    padding: 20px 14px;
   }
 }

@@ -2,13 +2,16 @@
 'use strict';
 
 const express = require('express');
+
+const { issueCsrfToken } = require('./csrf');
+const { bootstrapFirstStudent } = require('./bootstrap-owner');
+
 const {
+  DUMMY_PASSWORD_HASH,
   hashPassword,
   validatePassword,
   verifyPassword,
 } = require('./passwords');
-const { issueCsrfToken } = require('./csrf');
-const { bootstrapFirstStudent } = require('./bootstrap-owner');
 
 function createAuthRouter({ db, rateLimiter, env = process.env } = {}) {
   if (!db || !rateLimiter) {
@@ -95,25 +98,49 @@ function createAuthRouter({ db, rateLimiter, env = process.env } = {}) {
       return res.status(409).json({ error: 'An account with this email already exists.' });
     }
 
-    const passwordHash = await hashPassword(password);
+       const passwordHash = await hashPassword(password);
 
     let studentId;
 
     try {
-      const result = db.prepare(`
-        INSERT INTO students (display_name, email, password_hash)
-        VALUES (?, ?, ?)
-      `).run(name, email, passwordHash);
+      const createStudentAndBootstrap = db.transaction(() => {
+        let result;
 
-      studentId = Number(result.lastInsertRowid);
-    } catch (error) {
-      if (String(error.code).startsWith('SQLITE_CONSTRAINT')) {
-        return res.status(409).json({ error: 'An account with this email already exists.' });
+        try {
+          result = db.prepare(`
+            INSERT INTO students (display_name, email, password_hash)
+            VALUES (?, ?, ?)
+          `).run(name, email, passwordHash);
+        } catch (error) {
+          if (error.code === 'SQLITE_CONSTRAINT_UNIQUE') {
+            return { duplicate: true };
+          }
+
+          throw error;
+        }
+
+        const newStudentId = Number(result.lastInsertRowid);
+
+        bootstrapFirstStudent(db, newStudentId);
+
+        return {
+          duplicate: false,
+          studentId: newStudentId,
+        };
+      });
+
+      const creation = createStudentAndBootstrap.immediate();
+
+      if (creation.duplicate) {
+        return res.status(409).json({
+          error: 'An account with this email already exists.',
+        });
       }
+
+      studentId = creation.studentId;
+    } catch (error) {
       throw error;
     }
-
-    bootstrapFirstStudent(db, studentId);
 
     await regenerateSession(req, studentId);
 
@@ -167,10 +194,14 @@ function createAuthRouter({ db, rateLimiter, env = process.env } = {}) {
       WHERE email = ?
     `).get(email);
 
-    const validPassword = await verifyPassword(
-      student?.password_hash,
-      password
-    );
+    const passwordHash = student
+  ? student.password_hash
+  : DUMMY_PASSWORD_HASH;
+
+const validPassword = await verifyPassword(
+  passwordHash,
+  password
+);
 
     if (!student || !validPassword) {
       return res.status(401).json({ error: 'Invalid email or password.' });
