@@ -917,6 +917,135 @@ test('students cannot access or modify another student study sessions', async (t
 });
 
 
+test('study streak counts only valid completed dates belonging to the student', async (t) => {
+  const fixture = createTestApp(
+    path.join(tempRoot, 'study-streak-validation.db')
+  );
+
+  t.after(() => fixture.db.close());
+
+  const server = await startTestServer(fixture.app);
+
+  t.after(() => new Promise((resolve) => {
+    server.close(resolve);
+  }));
+
+  async function registerStudent(name, email) {
+    const csrfResponse = await sendRequest(server, {
+      method: 'GET',
+      pathname: '/api/csrf-token',
+    });
+
+    assert.equal(csrfResponse.status, 200);
+
+    const registrationResponse = await sendRequest(server, {
+      method: 'POST',
+      pathname: '/api/auth/register',
+      headers: {
+        Origin: 'http://localhost:5173',
+        'x-csrf-token': csrfResponse.body.csrfToken,
+      },
+      cookie: cookieHeader(csrfResponse),
+      body: {
+        name,
+        email,
+        password: 'StrongPassword123!',
+      },
+    });
+
+    assert.equal(registrationResponse.status, 201);
+
+    return {
+      cookie: cookieHeader(registrationResponse),
+      csrfToken: registrationResponse.body.csrfToken,
+    };
+  }
+
+  const studentA = await registerStudent(
+    'Streak Student A',
+    'streak-student-a@example.com'
+  );
+
+  const studentB = await registerStudent(
+    'Streak Student B',
+    'streak-student-b@example.com'
+  );
+
+  const studentAId = fixture.db
+    .prepare('SELECT id FROM students WHERE email = ?')
+    .get('streak-student-a@example.com').id;
+
+  const studentBId = fixture.db
+    .prepare('SELECT id FROM students WHERE email = ?')
+    .get('streak-student-b@example.com').id;
+
+  const today = new Intl.DateTimeFormat('en-CA', {
+    timeZone: 'Asia/Kolkata',
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+  }).format(new Date());
+
+  function dateOffset(days) {
+    const date = new Date(`${today}T00:00:00.000Z`);
+    date.setUTCDate(date.getUTCDate() + days);
+    return date.toISOString().slice(0, 10);
+  }
+
+  const insertSession = fixture.db.prepare(`
+    INSERT INTO study_sessions (
+      student_id,
+      subject,
+      topic,
+      study_date,
+      start_time,
+      duration_minutes,
+      completed
+    )
+    VALUES (?, 'Java', 'Test topic', ?, '10:00', 30, ?)
+  `);
+
+  // Valid completed study dates.
+  for (const date of [
+    dateOffset(-2),
+    dateOffset(-1),
+    today,
+  ]) {
+    insertSession.run(studentAId, date, 1);
+  }
+
+  // Future and invalid dates must not count.
+  insertSession.run(studentAId, dateOffset(1), 1);
+  insertSession.run(studentAId, '2026-02-31', 1);
+  insertSession.run(studentAId, '2020-99-99', 1);
+
+  // Incomplete sessions must not count.
+  insertSession.run(studentAId, dateOffset(-10), 0);
+
+  // Another student's session must not count.
+  insertSession.run(studentBId, today, 1);
+
+  const response = await sendRequest(server, {
+    pathname: '/api/study-streak',
+    cookie: studentA.cookie,
+  });
+
+  assert.equal(response.status, 200);
+
+  assert.deepEqual(response.body, {
+    currentStreak: 3,
+    longestStreak: 3,
+    totalStudyDays: 3,
+    studiedToday: true,
+    studyDates: [
+      dateOffset(-2),
+      dateOffset(-1),
+      today,
+    ],
+  });
+});
+
+
 test('students have isolated roadmap and topic progress', async (t) => {
   const fixture = createTestApp(
     path.join(tempRoot, 'student-progress-isolation.db')

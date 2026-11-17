@@ -910,6 +910,19 @@ app.patch('/api/study-sessions/:id', (req, res) => {
     });
   }
 
+  const today = new Intl.DateTimeFormat('en-CA', {
+  timeZone: 'Asia/Kolkata',
+  year: 'numeric',
+  month: '2-digit',
+  day: '2-digit',
+}).format(new Date());
+
+if (newCompleted && newDate > today) {
+  return res.status(400).json({
+    message: 'Future study sessions cannot be marked as completed',
+  });
+}
+
   db.prepare(`
     UPDATE study_sessions
     SET subject = ?,
@@ -1430,14 +1443,35 @@ app.get('/api/study-streak', (req, res) => {
 `).all(req.student.id, req.student.id)
   .map((row) => row.study_date);
 
-    const dates = [...new Set(studyDates)].sort();
-
     const today = new Intl.DateTimeFormat('en-CA', {
-      timeZone: 'Asia/Kolkata',
-      year: 'numeric',
-      month: '2-digit',
-      day: '2-digit',
-    }).format(new Date());
+  timeZone: 'Asia/Kolkata',
+  year: 'numeric',
+  month: '2-digit',
+  day: '2-digit',
+}).format(new Date());
+
+
+    // Validate calendar dates and exclude future dates.
+    const isValidDateOnly = (date) => {
+      if (
+        typeof date !== 'string' ||
+        !/^\d{4}-\d{2}-\d{2}$/.test(date)
+      ) {
+        return false;
+      }
+
+      const parsedDate = new Date(`${date}T00:00:00.000Z`);
+
+      return (
+        Number.isFinite(parsedDate.getTime()) &&
+        parsedDate.toISOString().slice(0, 10) === date
+      );
+    };
+
+    const dates = [...new Set(studyDates)]
+      .filter((date) => isValidDateOnly(date) && date <= today)
+      .sort();
+
 
     const dateSet = new Set(dates);
 
