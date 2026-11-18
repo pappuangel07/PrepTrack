@@ -621,6 +621,207 @@ test('registration invalidates the previous CSRF token', async (t) => {
 });
 
 
+test('task due dates must be valid calendar dates when creating or updating tasks', async (t) => {
+  const fixture = createTestApp(
+    path.join(tempRoot, 'task-due-date-validation.db')
+  );
+
+  t.after(() => fixture.db.close());
+
+  const server = await startTestServer(fixture.app);
+
+  t.after(() => new Promise((resolve) => {
+    server.close(resolve);
+  }));
+
+  const csrfResponse = await sendRequest(server, {
+    method: 'GET',
+    pathname: '/api/csrf-token',
+  });
+
+  assert.equal(csrfResponse.status, 200);
+
+  const registrationResponse = await sendRequest(server, {
+    method: 'POST',
+    pathname: '/api/auth/register',
+    headers: {
+      Origin: 'http://localhost:5173',
+      'x-csrf-token': csrfResponse.body.csrfToken,
+    },
+    cookie: cookieHeader(csrfResponse),
+    body: {
+      name: 'Date Test Student',
+      email: 'task-date-test@example.com',
+      password: 'StrongPassword123!',
+    },
+  });
+
+  assert.equal(registrationResponse.status, 201);
+
+  const student = {
+    cookie: cookieHeader(registrationResponse),
+    csrfToken: registrationResponse.body.csrfToken,
+  };
+
+  const requestHeaders = {
+    Origin: 'http://localhost:5173',
+    'x-csrf-token': student.csrfToken,
+  };
+
+  // Valid dates, including a leap day, must be accepted.
+  const validCreateResponse = await sendRequest(server, {
+    method: 'POST',
+    pathname: '/api/tasks',
+    headers: requestHeaders,
+    cookie: student.cookie,
+    body: {
+      title: 'Valid date task',
+      due_date: '2024-02-29',
+    },
+  });
+
+  assert.equal(validCreateResponse.status, 201);
+  assert.equal(validCreateResponse.body.task.due_date, '2024-02-29');
+
+  // Null must remain valid when creating a task without a due date.
+  const nullCreateResponse = await sendRequest(server, {
+    method: 'POST',
+    pathname: '/api/tasks',
+    headers: requestHeaders,
+    cookie: student.cookie,
+    body: {
+      title: 'No due date task',
+      due_date: null,
+    },
+  });
+
+  assert.equal(nullCreateResponse.status, 201);
+  assert.equal(nullCreateResponse.body.task.due_date, null);
+
+  // Impossible calendar dates must be rejected during creation.
+  const invalidDates = [
+    '2026-02-31',
+    '2026-13-10',
+    '2026-00-15',
+    '2026-04-31',
+    '2025-02-29',
+    '2026/02/15',
+  ];
+
+  for (const invalidDate of invalidDates) {
+    const response = await sendRequest(server, {
+      method: 'POST',
+      pathname: '/api/tasks',
+      headers: requestHeaders,
+      cookie: student.cookie,
+      body: {
+        title: 'Invalid date task',
+        due_date: invalidDate,
+      },
+    });
+
+    assert.equal(
+      response.status,
+      400,
+      `POST should reject ${invalidDate}`
+    );
+  }
+
+  const taskId = validCreateResponse.body.task.id;
+
+  // Impossible dates must also be rejected during updates.
+  for (const invalidDate of invalidDates) {
+    const response = await sendRequest(server, {
+      method: 'PATCH',
+      pathname: `/api/tasks/${taskId}`,
+      headers: requestHeaders,
+      cookie: student.cookie,
+      body: {
+        due_date: invalidDate,
+      },
+    });
+
+    assert.equal(
+      response.status,
+      400,
+      `PATCH should reject ${invalidDate}`
+    );
+
+    // A rejected update must not change the stored date.
+    const storedTask = fixture.db.prepare(`
+      SELECT due_date
+      FROM tasks
+      WHERE id = ?
+    `).get(taskId);
+
+    assert.equal(storedTask.due_date, '2024-02-29');
+  }
+
+  // A valid date must be accepted during an update.
+  const validUpdateResponse = await sendRequest(server, {
+    method: 'PATCH',
+    pathname: `/api/tasks/${taskId}`,
+    headers: requestHeaders,
+    cookie: student.cookie,
+    body: {
+      due_date: '2026-02-28',
+    },
+  });
+
+  assert.equal(validUpdateResponse.status, 200);
+
+  let storedTask = fixture.db.prepare(`
+    SELECT due_date
+    FROM tasks
+    WHERE id = ?
+  `).get(taskId);
+
+  assert.equal(storedTask.due_date, '2026-02-28');
+
+  // Omitting due_date must preserve the existing date.
+  const titleUpdateResponse = await sendRequest(server, {
+    method: 'PATCH',
+    pathname: `/api/tasks/${taskId}`,
+    headers: requestHeaders,
+    cookie: student.cookie,
+    body: {
+      title: 'Updated task title',
+    },
+  });
+
+  assert.equal(titleUpdateResponse.status, 200);
+
+  storedTask = fixture.db.prepare(`
+    SELECT due_date
+    FROM tasks
+    WHERE id = ?
+  `).get(taskId);
+
+  assert.equal(storedTask.due_date, '2026-02-28');
+
+  // Explicit null must clear the due date.
+  const clearDateResponse = await sendRequest(server, {
+    method: 'PATCH',
+    pathname: `/api/tasks/${taskId}`,
+    headers: requestHeaders,
+    cookie: student.cookie,
+    body: {
+      due_date: null,
+    },
+  });
+
+  assert.equal(clearDateResponse.status, 200);
+
+  storedTask = fixture.db.prepare(`
+    SELECT due_date
+    FROM tasks
+    WHERE id = ?
+  `).get(taskId);
+
+  assert.equal(storedTask.due_date, null);
+});
+
+
 test('students cannot access or modify another student tasks', async (t) => {
   const fixture = createTestApp(
     path.join(tempRoot, 'student-task-isolation.db')

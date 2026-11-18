@@ -97,6 +97,23 @@ app.get('/', (req, res) => {
   // Allowed task priorities
   const allowedPriorities = ['High', 'Medium', 'Low'];
 
+  // Validate that a date is a real calendar date in YYYY-MM-DD format.
+  const isValidDateOnly = (date) => {
+    if (
+      typeof date !== 'string' ||
+      !/^\d{4}-\d{2}-\d{2}$/.test(date)
+    ) {
+      return false;
+    }
+
+    const parsedDate = new Date(`${date}T00:00:00.000Z`);
+
+    return (
+      Number.isFinite(parsedDate.getTime()) &&
+      parsedDate.toISOString().slice(0, 10) === date
+    );
+  };
+
 
  // ======================================
 // JAVA TOPICS API
@@ -499,13 +516,9 @@ app.post('/api/tasks', (req, res) => {
     });
   }
 
-  if (
-    due_date !== null &&
-    (typeof due_date !== 'string' ||
-      !/^\d{4}-\d{2}-\d{2}$/.test(due_date))
-  ) {
+  if (due_date !== null && !isValidDateOnly(due_date)) {
     return res.status(400).json({
-      message: 'Due date must use YYYY-MM-DD format'
+      message: 'Due date must be a valid date in YYYY-MM-DD format'
     });
   }
 
@@ -617,16 +630,11 @@ app.patch('/api/tasks/:id', (req, res) => {
       });
     }
 
-    if (
-      newDueDate !== null &&
-      (typeof newDueDate !== 'string' ||
-        !/^\d{4}-\d{2}-\d{2}$/.test(newDueDate))
-    ) {
+    if (newDueDate !== null && !isValidDateOnly(newDueDate)) {
       return res.status(400).json({
-        message: 'Due date must use YYYY-MM-DD format'
+        message: 'Due date must be a valid date in YYYY-MM-DD format'
       });
     }
-
     db.prepare(`
       UPDATE tasks
       SET title = ?, description = ?, due_date = ?, priority = ?
@@ -1449,24 +1457,6 @@ app.get('/api/study-streak', (req, res) => {
   month: '2-digit',
   day: '2-digit',
 }).format(new Date());
-
-
-    // Validate calendar dates and exclude future dates.
-    const isValidDateOnly = (date) => {
-      if (
-        typeof date !== 'string' ||
-        !/^\d{4}-\d{2}-\d{2}$/.test(date)
-      ) {
-        return false;
-      }
-
-      const parsedDate = new Date(`${date}T00:00:00.000Z`);
-
-      return (
-        Number.isFinite(parsedDate.getTime()) &&
-        parsedDate.toISOString().slice(0, 10) === date
-      );
-    };
 
     const dates = [...new Set(studyDates)]
       .filter((date) => isValidDateOnly(date) && date <= today)
