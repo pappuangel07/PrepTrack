@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
+import { apiFetch } from './api';
 
 function StudyPlanner({ goToDashboard }) {
   const [sessions, setSessions] = useState([]);
@@ -33,7 +34,7 @@ useEffect(() => {
 
   async function fetchSessions() {
     try {
-      const response = await fetch('/api/study-sessions');
+      const response = await apiFetch('/api/study-sessions');
 
       if (!response.ok) {
         throw new Error('Unable to load study sessions.');
@@ -87,7 +88,7 @@ async function toggleSession(session) {
     setError('');
     setMessage('');
 
-    const response = await fetch(
+    const response = await apiFetch(
       `/api/study-sessions/${session.id}`,
       {
         method: 'PATCH',
@@ -139,7 +140,7 @@ async function saveEdit(event) {
     setError('');
     setMessage('');
 
-    const response = await fetch(
+    const response = await apiFetch(
       `/api/study-sessions/${editingSessionId}`,
       {
         method: 'PATCH',
@@ -190,7 +191,7 @@ async function deleteSession(sessionId) {
     setError('');
     setMessage('');
 
-    const response = await fetch(
+    const response = await apiFetch(
       `/api/study-sessions/${sessionId}`,
       {
         method: 'DELETE',
@@ -222,7 +223,7 @@ async function deleteSession(sessionId) {
       setError('');
       setMessage('');
 
-      const response = await fetch('/api/study-sessions', {
+      const response = await apiFetch('/api/study-sessions', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

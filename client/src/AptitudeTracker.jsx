@@ -1,5 +1,6 @@
 
 import { useEffect, useMemo, useState } from 'react';
+import { apiFetch } from './api';
 
 function AptitudeTracker() {
   const [topics, setTopics] = useState([]);
@@ -12,7 +13,7 @@ function AptitudeTracker() {
   useEffect(() => {
     async function loadTopics() {
       try {
-        const response = await fetch('/api/aptitude-topics');
+        const response = await apiFetch('/api/aptitude-topics');
 
         if (!response.ok) {
           throw new Error('Unable to load Aptitude topics.');
@@ -35,7 +36,7 @@ function AptitudeTracker() {
     setError('');
 
     try {
-      const response = await fetch(`/api/aptitude-topics/${id}`, {
+      const response = await apiFetch(`/api/aptitude-topics/${id}`, {
         method: 'PATCH',
         headers: {
           'Content-Type': 'application/json',

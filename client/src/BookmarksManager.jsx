@@ -1,5 +1,5 @@
-
 import { useEffect, useMemo, useState } from 'react';
+import { apiFetch } from './api';
 
 function BookmarksManager({ goToDashboard }) {
   const [bookmarks, setBookmarks] = useState([]);
@@ -23,7 +23,7 @@ useEffect(() => {
 
   async function fetchBookmarks() {
     try {
-      const response = await fetch('/api/bookmarks');
+      const response = await apiFetch('/api/bookmarks');
 
       if (!response.ok) {
         throw new Error('Unable to load bookmarks.');
@@ -57,7 +57,7 @@ async function loadBookmarks() {
   try {
     setLoading(true);
     setError('');
-    const response = await fetch('/api/bookmarks');
+    const response = await apiFetch('/api/bookmarks');
 
     if (!response.ok) {
       throw new Error('Unable to load bookmarks.');
@@ -102,7 +102,7 @@ async function loadBookmarks() {
         ? `/api/bookmarks/${editingBookmarkId}`
         : '/api/bookmarks';
 
-      const response = await fetch(endpoint, {
+      const response = await apiFetch(endpoint, {
         method: isEditing ? 'PUT' : 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -170,7 +170,7 @@ async function loadBookmarks() {
       setError('');
       setMessage('');
 
-      const response = await fetch(`/api/bookmarks/${bookmarkId}`, {
+      const response = await apiFetch(`/api/bookmarks/${bookmarkId}`, {
         method: 'DELETE',
       });
 

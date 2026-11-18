@@ -11,14 +11,20 @@ function bootstrapFirstStudent(db, studentId) {
       'SELECT id FROM students WHERE id = ?'
     ).get(studentId);
 
-    if (!student) throw new Error('Student does not exist.');
+    if (!student) {
+      throw new Error('Student does not exist.');
+    }
 
+    // The database trigger protects this permanent marker from deletion.
     const existing = db.prepare(
       'SELECT owner_student_id FROM bootstrap_state WHERE singleton = 1'
     ).get();
 
-    if (existing) return { bootstrapped: false };
+    if (existing) {
+      return { bootstrapped: false };
+    }
 
+    // Only the first registered student can claim legacy records.
     const students = db.prepare(
       'SELECT COUNT(*) AS total, MIN(id) AS first_id FROM students'
     ).get();
@@ -47,7 +53,6 @@ function bootstrapFirstStudent(db, studentId) {
       'UPDATE bookmarks SET student_id = ? WHERE student_id IS NULL'
     ).run(studentId);
 
-    // Transfer legacy roadmap progress to the first student.
     const roadmapProgress = db.prepare(`
       INSERT INTO roadmap_progress
         (student_id, roadmap_id, status, updated_at)
@@ -57,7 +62,6 @@ function bootstrapFirstStudent(db, studentId) {
       ON CONFLICT(student_id, roadmap_id) DO NOTHING
     `).run(studentId);
 
-    // Transfer legacy Java topic progress.
     const javaProgress = db.prepare(`
       INSERT INTO java_topic_progress
         (student_id, topic_id, status, updated_at)
@@ -67,7 +71,6 @@ function bootstrapFirstStudent(db, studentId) {
       ON CONFLICT(student_id, topic_id) DO NOTHING
     `).run(studentId);
 
-    // Transfer legacy DSA topic progress.
     const dsaProgress = db.prepare(`
       INSERT INTO dsa_topic_progress
         (student_id, topic_id, status, updated_at)
@@ -77,7 +80,6 @@ function bootstrapFirstStudent(db, studentId) {
       ON CONFLICT(student_id, topic_id) DO NOTHING
     `).run(studentId);
 
-    // Transfer legacy aptitude topic progress.
     const aptitudeProgress = db.prepare(`
       INSERT INTO aptitude_topic_progress
         (student_id, topic_id, status, updated_at)
@@ -101,10 +103,9 @@ function bootstrapFirstStudent(db, studentId) {
       javaProgressTransferred: javaProgress.changes,
       dsaProgressTransferred: dsaProgress.changes,
       aptitudeProgressTransferred: aptitudeProgress.changes,
-      bookmarksTransferred: bookmarks.changes
+      bookmarksTransferred: bookmarks.changes,
     };
   });
-
   return operation.immediate();
 }
 

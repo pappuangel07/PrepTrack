@@ -1,5 +1,7 @@
 
 import { useEffect, useState } from 'react';
+import Auth from './Auth';
+import { apiFetch, initializeCsrf } from './api';
 import './App.css';
 import JavaTracker from './JavaTracker';
 import DSATracker from './DSATracker';
@@ -12,8 +14,12 @@ import BookmarksManager from './BookmarksManager';
 
 function App() {
   const [activePage, setActivePage] = useState('dashboard');
- const goToDashboard = () => {
-  window.location.reload();
+  const [student, setStudent] = useState(null);
+const [authLoading, setAuthLoading] = useState(true);
+const [authError, setAuthError] = useState('');
+const [loggingOut, setLoggingOut] = useState(false);
+const goToDashboard = () => {
+  setActivePage('dashboard');
 };
   const [javaTopics, setJavaTopics] = useState([]);
   const [dsaTopics, setDsaTopics] = useState([]);
@@ -99,93 +105,97 @@ const [aptitudeTopics, setAptitudeTopics] = useState([]);
     return Number(b.id) - Number(a.id);
   });
 
-  // Load roadmap and tasks from the backend
-  useEffect(() => {
-    async function loadRoadmap() {
-      try {
-        const response = await fetch('/api/roadmap');
 
-        if (!response.ok) {
-          throw new Error('Unable to load roadmap.');
+  // Restore the existing login session
+  useEffect(() => {
+    let active = true;
+
+    async function restoreSession() {
+      try {
+        await initializeCsrf();
+
+        const response = await apiFetch('/api/auth/me');
+
+        if (response.status === 401) {
+          if (active) setStudent(null);
+          return;
         }
 
-        setRoadmap(await response.json());
+        if (!response.ok) {
+          throw new Error('Unable to verify your login session.');
+        }
+
+        const data = await response.json();
+
+        if (active) {
+          setStudent(data.student);
+        }
       } catch (err) {
-        setError(err.message || 'Unable to load roadmap.');
+        if (active) {
+          setAuthError(err.message || 'Unable to connect to PrepTrack.');
+        }
       } finally {
-        setLoading(false);
+        if (active) {
+          setAuthLoading(false);
+        }
       }
     }
 
-    async function loadTasks() {
+    restoreSession();
+
+    return () => {
+      active = false;
+    };
+  }, []);
+
+  // Load student data only after authentication
+  useEffect(() => {
+    if (!student) return;
+
+    let active = true;
+
+    async function loadData(url, setter, errorMessage) {
       try {
-        const response = await fetch('/api/tasks');
+        const response = await apiFetch(url);
 
         if (!response.ok) {
-          throw new Error('Unable to load tasks.');
+          throw new Error(errorMessage);
         }
 
-        setTasks(await response.json());
-        setTaskError('');
+        const data = await response.json();
+
+        if (active) {
+          setter(data);
+        }
       } catch (err) {
-        setTaskError(err.message || 'Unable to load tasks.');
-      } finally {
+        if (active) {
+          setError(err.message || errorMessage);
+        }
+      }
+    }
+
+    async function loadAllData() {
+      await Promise.all([
+        loadData('/api/roadmap', setRoadmap, 'Unable to load roadmap.'),
+        loadData('/api/tasks', setTasks, 'Unable to load tasks.'),
+        loadData('/api/java-topics', setJavaTopics, 'Unable to load Java topics.'),
+        loadData('/api/dsa-topics', setDsaTopics, 'Unable to load DSA topics.'),
+        loadData('/api/aptitude-topics', setAptitudeTopics, 'Unable to load Aptitude topics.'),
+      ]);
+
+      if (active) {
+        setLoading(false);
         setTasksLoading(false);
       }
     }
-    async function loadJavaTopics() {
-  try {
-    const response = await fetch('/api/java-topics');
 
-    if (!response.ok) {
-      throw new Error('Unable to load Java topics.');
-    }
+    loadAllData();
 
-    const data = await response.json();
-    setJavaTopics(data);
-  } catch (err) {
-    console.error('Unable to load Java topics:', err);
-  }
-}
+    return () => {
+      active = false;
+    };
+  }, [student]);
 
-
-async function loadDsaTopics() {
-  try {
-    const response = await fetch('/api/dsa-topics');
-
-    if (!response.ok) {
-      throw new Error('Could not load DSA topics.');
-    }
-
-    const data = await response.json();
-    setDsaTopics(data);
-  } catch (err) {
-    console.error('Error loading DSA topics:', err);
-  }
-}
-
-async function loadAptitudeTopics() {
-  try {
-    const response = await fetch('/api/aptitude-topics');
-
-    if (!response.ok) {
-      throw new Error('Could not load Aptitude topics.');
-    }
-
-    const data = await response.json();
-    setAptitudeTopics(data);
-  } catch (err) {
-    console.error('Error loading Aptitude topics:', err);
-  }
-}
-
-
-    loadRoadmap();
-    loadTasks();
-    loadJavaTopics();
-    loadDsaTopics();
-    loadAptitudeTopics();
-  }, []);
 
   // Update roadmap progress
   async function updateStatus(id, newStatus) {
@@ -194,7 +204,7 @@ async function loadAptitudeTopics() {
     setSuccess('');
 
     try {
-      const response = await fetch(`/api/roadmap/${id}`, {
+      const response = await apiFetch(`/api/roadmap/${id}`, {
         method: 'PATCH',
         headers: {
           'Content-Type': 'application/json',
@@ -234,7 +244,7 @@ async function loadAptitudeTopics() {
     setSavingTask(true);
 
     try {
-      const response = await fetch('/api/tasks', {
+      const response = await apiFetch('/api/tasks', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -274,7 +284,7 @@ async function toggleTask(task) {
   setTaskMessage('');
 
   try {
-    const response = await fetch(`/api/tasks/${task.id}`, {
+    const response = await apiFetch(`/api/tasks/${task.id}`, {
       method: 'PATCH',
       headers: {
         'Content-Type': 'application/json',
@@ -336,7 +346,7 @@ async function toggleTask(task) {
     setTaskMessage('');
 
     try {
-      const response = await fetch(`/api/tasks/${id}`, {
+      const response = await apiFetch(`/api/tasks/${id}`, {
         method: 'DELETE',
       });
 
@@ -395,7 +405,7 @@ setUndoTimeout(timeoutId);
     setTaskMessage('');
 
     try {
-      const response = await fetch(
+      const response = await apiFetch(
         `/api/tasks/${taskToRestore.id}/restore`,
         {
           method: 'PATCH',
@@ -461,7 +471,7 @@ setTaskMessage('Task restored successfully!');
     setTaskMessage('');
 
     try {
-      const response = await fetch(`/api/tasks/${editingTaskId}`, {
+      const response = await apiFetch(`/api/tasks/${editingTaskId}`, {
         method: 'PATCH',
         headers: {
           'Content-Type': 'application/json',
@@ -560,6 +570,74 @@ const overdueTasks = tasks.filter(
     task.due_date < new Date().toLocaleDateString('en-CA')
 ).length;
 
+async function handleLogout() {
+  setLoggingOut(true);
+  setAuthError('');
+
+  try {
+    const response = await apiFetch('/api/auth/logout', {
+      method: 'POST',
+    });
+
+    const data = await response.json();
+
+    if (!response.ok) {
+      throw new Error(data.error || 'Unable to logout.');
+    }
+
+    // Clear the previous student's data
+    setStudent(null);
+    setRoadmap([]);
+    setTasks([]);
+    setJavaTopics([]);
+    setDsaTopics([]);
+    setAptitudeTopics([]);
+
+    setActivePage('dashboard');
+    setAuthError('');
+  } catch (err) {
+    setAuthError(err.message || 'Unable to logout.');
+  } finally {
+    setLoggingOut(false);
+  }
+}
+
+if (authLoading) {
+  return (
+    <div className="auth-page">
+      <p>Checking your login session...</p>
+    </div>
+  );
+}
+
+if (authError && !student) {
+  return (
+    <div className="auth-page">
+      <div className="auth-card">
+        <h2>Unable to connect</h2>
+        <p className="auth-error">{authError}</p>
+        <button
+          className="auth-submit"
+          type="button"
+          onClick={() => window.location.reload()}
+        >
+          Try again
+        </button>
+      </div>
+    </div>
+  );
+}
+
+if (!student) {
+  return (
+    <Auth
+      onAuthenticated={(nextStudent) => {
+        setAuthError('');
+        setStudent(nextStudent);
+      }}
+    />
+  );
+}
 
 return (
   <div className="app">
@@ -608,10 +686,27 @@ return (
 
     <div className="app-content">
       <header className="header">
+  <h1>PrepTrack</h1>
+  <p>Your placement preparation journey starts here.</p>
 
-        <h1>PrepTrack</h1>
-        <p>Your placement preparation journey starts here.</p>
-      </header>
+  <div className="header-account">
+    <span>
+      {student.name} ({student.email})
+    </span>
+
+    <button
+      type="button"
+      className="secondary-button"
+      onClick={handleLogout}
+      disabled={loggingOut}
+    >
+      {loggingOut ? 'Logging out...' : 'Logout'}
+    </button>
+  </div>
+  {authError && (
+  <p className="auth-error">{authError}</p>
+)}
+</header>
 
       <main className="main">
         {activePage === 'java' ? (

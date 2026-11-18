@@ -1,4 +1,4 @@
-
+import { apiFetch } from './api';
 import { useEffect, useRef, useState } from 'react';
 const FOCUS_SECONDS = 25 * 60;
 const BREAK_SECONDS = 5 * 60;
@@ -31,7 +31,7 @@ useEffect(() => {
     completionHandled.current = true;
 
     if (mode === 'focus') {
-      fetch('/api/pomodoro-sessions', {
+      apiFetch('/api/pomodoro-sessions', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -76,7 +76,7 @@ useEffect(() => {
 useEffect(() => {
   const fetchSessions = async () => {
     try {
-      const response = await fetch('/api/pomodoro-sessions');
+      const response = await apiFetch('/api/pomodoro-sessions');
 
       if (!response.ok) {
         throw new Error('Failed to fetch sessions');

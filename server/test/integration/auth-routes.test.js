@@ -1394,6 +1394,14 @@ test('registration rolls back student creation when bootstrap fails', async (t) 
     server.close(resolve);
   }));
 
+    const legacyTaskId = fixture.db.prepare(`
+    INSERT INTO tasks (title, description)
+    VALUES (?, ?)
+  `).run(
+    'Legacy rollback task',
+    'Must remain unassigned after failed registration'
+  ).lastInsertRowid;
+
   // Inject a failure at the final bootstrap step.
   // This is added after app startup so schema readiness is unaffected.
   fixture.db.exec(`
@@ -1438,6 +1446,15 @@ test('registration rolls back student creation when bootstrap fails', async (t) 
 
   assert.equal(studentCount, 0, 'student insertion must roll back');
   assert.equal(bootstrapCount, 0, 'bootstrap marker must not remain');
+    const legacyTask = fixture.db.prepare(`
+    SELECT id, title, student_id
+    FROM tasks
+    WHERE id = ?
+  `).get(legacyTaskId);
+
+  assert.ok(legacyTask, 'legacy task must not be deleted');
+  assert.equal(legacyTask.title, 'Legacy rollback task');
+  assert.equal(legacyTask.student_id, null);
 });
 
 

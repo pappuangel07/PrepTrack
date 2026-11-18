@@ -1,5 +1,6 @@
 
 import { useEffect, useMemo, useState } from 'react';
+import { apiFetch } from './api';
 
 function NotesManager({ goToDashboard }) {
   const [notes, setNotes] = useState([]);
@@ -21,7 +22,7 @@ function NotesManager({ goToDashboard }) {
     setLoading(true);
     setError('');
 
-      const response = await fetch('/api/notes');
+      const response = await apiFetch('/api/notes');
 
       if (!response.ok) {
         throw new Error('Unable to load notes.');
@@ -42,7 +43,7 @@ useEffect(() => {
 
   async function fetchNotes() {
     try {
-      const response = await fetch('/api/notes');
+      const response = await apiFetch('/api/notes');
 
       if (!response.ok) {
         throw new Error('Unable to load notes.');
@@ -98,7 +99,7 @@ useEffect(() => {
         ? `/api/notes/${editingNoteId}`
         : '/api/notes';
 
-      const response = await fetch(url, {
+      const response = await apiFetch(url, {
         method: isEditing ? 'PUT' : 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -156,7 +157,7 @@ useEffect(() => {
       setError('');
       setMessage('');
 
-      const response = await fetch(`/api/notes/${noteId}`, {
+      const response = await apiFetch(`/api/notes/${noteId}`, {
         method: 'DELETE',
       });
 

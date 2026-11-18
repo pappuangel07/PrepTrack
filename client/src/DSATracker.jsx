@@ -1,4 +1,4 @@
-
+import { apiFetch } from './api';
 import { useEffect, useMemo, useState } from 'react';
 
 function DSATracker() {
@@ -12,7 +12,7 @@ function DSATracker() {
   useEffect(() => {
     async function loadTopics() {
       try {
-        const response = await fetch('/api/dsa-topics');
+        const response = await apiFetch('/api/dsa-topics');
 
         if (!response.ok) {
           throw new Error('Unable to load DSA topics.');
@@ -35,7 +35,7 @@ function DSATracker() {
     setError('');
 
     try {
-      const response = await fetch(`/api/dsa-topics/${id}`, {
+      const response = await apiFetch(`/api/dsa-topics/${id}`, {
         method: 'PATCH',
         headers: {
           'Content-Type': 'application/json',

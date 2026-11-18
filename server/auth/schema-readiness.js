@@ -1,3 +1,4 @@
+
 'use strict';
 
 // Startup readiness is deliberately metadata-only. Migration validators also
@@ -321,6 +322,19 @@ const EXPECTED_EXPLICIT_INDEXES = {
   session_revocations: ['session_revocations_expiry_idx'],
 };
 
+// This is the only application trigger permitted by startup readiness.
+// It permanently protects the one-time legacy-data ownership marker.
+const EXPECTED_TRIGGERS = {
+  bootstrap_state: {
+    name: 'bootstrap_state_prevent_delete',
+    sql: `CREATE TRIGGER bootstrap_state_prevent_delete
+      BEFORE DELETE ON bootstrap_state
+      BEGIN
+        SELECT RAISE(ABORT, 'bootstrap_state cannot be deleted');
+      END`,
+  },
+};
+
 function normalizeSql(sql) {
   const source = String(sql || '').trim().replace(/;$/, '');
   let normalized = '';
@@ -426,6 +440,38 @@ function assertIndex(db, name, [table, unique, partial, expectedColumns]) {
   }
 }
 
+function assertExpectedTriggers(db) {
+  for (const table of REQUIRED_TABLES) {
+    const actual = db.prepare(
+      "SELECT name, sql FROM sqlite_master WHERE type = 'trigger' AND tbl_name = ? ORDER BY name"
+    ).all(table);
+
+    const expected = EXPECTED_TRIGGERS[table]
+      ? [EXPECTED_TRIGGERS[table]]
+      : [];
+
+    if (actual.length !== expected.length) {
+      throw new Error(`Required schema is incompatible: unexpected trigger on "${table}".`);
+    }
+
+    for (const expectedTrigger of expected) {
+      const actualTrigger = actual.find((trigger) => trigger.name === expectedTrigger.name);
+
+      if (!actualTrigger) {
+        throw new Error(
+          `Required schema is incompatible: expected trigger "${expectedTrigger.name}" is missing.`
+        );
+      }
+
+      if (normalizeSql(actualTrigger.sql) !== normalizeSql(expectedTrigger.sql)) {
+        throw new Error(
+          `Required schema is incompatible: trigger "${expectedTrigger.name}" differs.`
+        );
+      }
+    }
+  }
+}
+
 function assertSchemaReady(db) {
   if (!db || typeof db.prepare !== 'function' || typeof db.pragma !== 'function') {
     throw new TypeError('A better-sqlite3 database connection is required.');
@@ -484,10 +530,10 @@ function assertSchemaReady(db) {
     }
   }
 
-  for (const table of REQUIRED_TABLES) {
-    const triggers = db.prepare("SELECT name FROM sqlite_master WHERE type = 'trigger' AND tbl_name = ?").all(table);
-    if (triggers.length) throw new Error(`Required schema is incompatible: unexpected trigger on "${table}".`);
-  }
+  // Permit only the exact trigger that protects the bootstrap ownership marker.
+  // Every other trigger, including a modified version of this one, is rejected.
+  assertExpectedTriggers(db);
+
   for (const table of ['auth_rate_limits', 'session_revocations']) {
     assertForeignKeys(db, table, EXPECTED_FOREIGN_KEYS[table]);
   }

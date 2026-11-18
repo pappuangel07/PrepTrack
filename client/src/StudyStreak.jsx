@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { apiFetch } from './api';
 
 function StudyStreak() {
   const [streak, setStreak] = useState(null);
@@ -7,7 +8,7 @@ function StudyStreak() {
   useEffect(() => {
     const fetchStreak = async () => {
       try {
-        const response = await fetch('/api/study-streak');
+        const response = await apiFetch('/api/study-streak');
 
         if (!response.ok) {
           throw new Error('Failed to fetch study streak');

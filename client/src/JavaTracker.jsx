@@ -1,5 +1,6 @@
 
 import { useEffect, useMemo, useState } from 'react';
+import { apiFetch } from './api';
 
 function JavaTracker() {
   const [topics, setTopics] = useState([]);
@@ -12,7 +13,7 @@ function JavaTracker() {
   useEffect(() => {
     async function loadTopics() {
       try {
-        const response = await fetch('/api/java-topics');
+        const response = await apiFetch('/api/java-topics');
 
         if (!response.ok) {
           throw new Error('Could not load Java topics.');
@@ -56,7 +57,7 @@ function JavaTracker() {
     setError('');
 
     try {
-      const response = await fetch(`/api/java-topics/${id}`, {
+      const response = await apiFetch(`/api/java-topics/${id}`, {
         method: 'PATCH',
         headers: {
           'Content-Type': 'application/json',
