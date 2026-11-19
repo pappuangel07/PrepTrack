@@ -1871,3 +1871,312 @@ body {
     padding: 20px 14px;
   }
 }
+
+
+/* =====================================
+   DSA LEARNING HUB
+===================================== */
+
+.dsa-lesson {
+  margin-top: 24px;
+  padding-bottom: 40px;
+  color: #1e293b;
+}
+
+.dsa-lesson-header {
+  margin-top: 24px;
+  padding: 30px;
+  background: #ffffff;
+  border: 1px solid #e2e8f0;
+  border-radius: 18px;
+}
+
+.dsa-lesson-header h1 {
+  margin: 8px 0;
+  font-size: 30px;
+  line-height: 1.3;
+}
+
+.dsa-lesson-header > p:not(.java-eyebrow) {
+  color: #64748b;
+  line-height: 1.7;
+}
+
+.dsa-lesson-progress {
+  margin-top: 24px;
+}
+
+.dsa-lesson-progress-info {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 10px;
+}
+
+.dsa-lesson-progress-info span {
+  color: #64748b;
+  font-size: 13px;
+}
+
+.dsa-section-nav {
+  display: flex;
+  gap: 10px;
+  padding: 16px 0;
+  overflow-x: auto;
+  scrollbar-width: thin;
+}
+
+.dsa-section-link {
+  flex-shrink: 0;
+  padding: 10px 14px;
+  color: #475569;
+  background: #ffffff;
+  border: 1px solid #e2e8f0;
+  border-radius: 10px;
+  cursor: pointer;
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.dsa-section-link:hover,
+.dsa-section-link.active {
+  color: #4338ca;
+  background: #eef2ff;
+  border-color: #818cf8;
+}
+
+.dsa-lesson-content {
+  display: grid;
+  gap: 20px;
+}
+
+.dsa-lesson-section {
+  padding: 28px;
+  background: #ffffff;
+  border: 1px solid #e2e8f0;
+  border-radius: 16px;
+  scroll-margin-top: 24px;
+}
+
+.dsa-lesson-section h2 {
+  margin: 5px 0 22px;
+  font-size: 23px;
+  line-height: 1.4;
+}
+
+.dsa-lesson-section h3 {
+  margin: 24px 0 10px;
+  font-size: 17px;
+}
+
+.dsa-lesson-section p,
+.dsa-lesson-section li {
+  color: #475569;
+  font-size: 14px;
+  line-height: 1.8;
+}
+
+.dsa-lesson-section ul,
+.dsa-lesson-section ol {
+  padding-left: 24px;
+}
+
+.dsa-level {
+  margin: 0;
+  color: #4f46e5 !important;
+  font-size: 11px !important;
+  font-weight: 800;
+  letter-spacing: 1px;
+}
+
+.dsa-code {
+  margin: 14px 0;
+  padding: 18px;
+  overflow-x: auto;
+  color: #e2e8f0;
+  background: #172033;
+  border: 1px solid #334155;
+  border-radius: 12px;
+  font-size: 13px;
+  line-height: 1.8;
+  tab-size: 4;
+}
+
+.dsa-code code {
+  font-family: Consolas, 'Courier New', monospace;
+  white-space: pre;
+}
+
+.dsa-comparison-table {
+  width: 100%;
+  margin: 16px 0;
+  border-collapse: collapse;
+  font-size: 13px;
+}
+
+.dsa-comparison-table th,
+.dsa-comparison-table td {
+  padding: 12px;
+  text-align: left;
+  border: 1px solid #e2e8f0;
+}
+
+.dsa-comparison-table th {
+  color: #3730a3;
+  background: #eef2ff;
+}
+
+.dsa-comparison-table td {
+  color: #475569;
+}
+
+.dsa-practice-card {
+  margin-top: 14px;
+  padding: 18px;
+  border: 1px solid #e2e8f0;
+  border-radius: 12px;
+}
+
+.dsa-practice-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.dsa-practice-heading h3 {
+  margin: 5px 0;
+}
+
+.dsa-answer {
+  margin-top: 14px;
+  padding: 12px;
+  background: #f8fafc;
+  border-radius: 8px;
+}
+
+.dsa-lesson-section details {
+  margin: 12px 0;
+  padding: 15px;
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
+  border-radius: 10px;
+}
+
+.dsa-lesson-section summary {
+  color: #334155;
+  cursor: pointer;
+  font-size: 14px;
+  font-weight: 700;
+}
+
+.dsa-completion-panel {
+  margin-top: 20px;
+  padding: 24px;
+  background: #ffffff;
+  border: 1px solid #e2e8f0;
+  border-radius: 16px;
+}
+
+.dsa-completion-panel h2 {
+  margin-top: 0;
+}
+
+.dsa-completion-panel > p {
+  color: #64748b;
+  font-size: 14px;
+  line-height: 1.7;
+}
+
+.dsa-completion-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 11px 0;
+  color: #334155;
+  border-bottom: 1px solid #e2e8f0;
+  font-size: 14px;
+  cursor: pointer;
+}
+
+.dsa-completion-item input {
+  width: 17px;
+  height: 17px;
+  accent-color: #4f46e5;
+}
+
+/* Responsive design */
+
+@media (max-width: 640px) {
+  .dsa-lesson-header,
+  .dsa-lesson-section,
+  .dsa-completion-panel {
+    padding: 18px;
+  }
+
+  .dsa-lesson-header h1 {
+    font-size: 23px;
+  }
+
+  .dsa-lesson-section h2 {
+    font-size: 20px;
+  }
+
+  .dsa-lesson-progress-info {
+    flex-direction: column;
+  }
+
+  .dsa-practice-heading {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
+  .dsa-comparison-table {
+    font-size: 11px;
+  }
+
+  .dsa-comparison-table th,
+  .dsa-comparison-table td {
+    padding: 8px;
+  }
+}
+
+.dsa-practice-actions {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+  margin-top: 16px;
+}
+
+.dsa-platform-label {
+  display: inline-flex;
+  align-items: center;
+  padding: 6px 12px;
+  border-radius: 20px;
+  background: var(--surface-secondary, #eef2ff);
+  color: var(--text-primary, #3730a3);
+  font-size: 0.82rem;
+  font-weight: 600;
+}
+
+.dsa-practice-actions a {
+  text-decoration: none;
+}
+
+.dsa-practice-actions a:hover {
+  text-decoration: none;
+  transform: translateY(-2px);
+}
+
+@media (max-width: 480px) {
+  .dsa-practice-actions {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .dsa-practice-actions a {
+    text-align: center;
+  }
+}

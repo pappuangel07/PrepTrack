@@ -1,5 +1,6 @@
 import { apiFetch } from './api';
 import { useEffect, useMemo, useState } from 'react';
+import DSALesson from './DSALesson';
 
 function DSATracker() {
   const [topics, setTopics] = useState([]);
@@ -8,6 +9,7 @@ function DSATracker() {
   const [updatingId, setUpdatingId] = useState(null);
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState('All');
+  const [selectedTopic, setSelectedTopic] = useState(null);
 
   useEffect(() => {
     async function loadTopics() {
@@ -50,10 +52,10 @@ function DSATracker() {
       }
 
       setTopics((currentTopics) =>
-        currentTopics.map((topic) =>
-          topic.id === id ? data.topic : topic
-        )
-      );
+  currentTopics.map((topic) =>
+    topic.id === id ? data : topic
+  )
+);
     } catch (err) {
       setError(err.message || 'Could not update DSA topic.');
     } finally {
@@ -84,6 +86,14 @@ function DSATracker() {
       return matchesSearch && matchesStatus;
     });
   }, [topics, search, statusFilter]);
+
+  if (selectedTopic === 'Arrays') {
+  return (
+    <DSALesson
+      onBack={() => setSelectedTopic(null)}
+    />
+  );
+}
 
   if (loading) {
     return (
@@ -145,6 +155,15 @@ function DSATracker() {
               <span className="java-topic-category">{topic.category}</span>
               <h3>{topic.title}</h3>
               <p>{topic.description}</p>
+              {topic.title === 'Arrays' && (
+  <button
+    type="button"
+    className="secondary-button"
+    onClick={() => setSelectedTopic('Arrays')}
+  >
+    Start Learning →
+  </button>
+)}
             </div>
 
             <label className="java-status-label">
