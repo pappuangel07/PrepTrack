@@ -1,6 +1,14 @@
 import { apiFetch } from './api';
 import { useEffect, useMemo, useState } from 'react';
 import DSALesson from './DSALesson';
+import StringsLesson from './StringsLesson';
+import LinkedListLesson from './LinkedListLesson';
+import StackLesson from './StackLesson';
+import QueuesLesson from './QueuesLesson';
+import HashingLesson from './HashingLesson';
+import TwoPointersLesson from './TwoPointersLesson';
+import SlidingWindowLesson from './SlidingWindowLesson';
+
 
 function DSATracker() {
   const [topics, setTopics] = useState([]);
@@ -95,6 +103,54 @@ function DSATracker() {
   );
 }
 
+if (selectedTopic === 'Strings') {
+  return (
+    <StringsLesson onBack={() => setSelectedTopic(null)} />
+  );
+}
+
+if (selectedTopic === 'Linked Lists') {
+  return (
+    <LinkedListLesson onBack={() => setSelectedTopic(null)} />
+  );
+}
+
+if (selectedTopic === 'Stacks') {
+  return (
+    <StackLesson
+      onBack={() => setSelectedTopic(null)}
+    />
+  );
+}
+
+if (selectedTopic === 'Queues') {
+  return (
+    <QueuesLesson
+      onBack={() => setSelectedTopic(null)}
+    />
+  );
+}
+
+if (selectedTopic === 'Hashing') {
+  return <HashingLesson onBack={() => setSelectedTopic(null)} />;
+}
+
+if (selectedTopic === 'Two Pointers') {
+  return (
+    <TwoPointersLesson
+      onBack={() => setSelectedTopic(null)}
+    />
+  );
+}
+
+if (selectedTopic === 'Sliding Windows') {
+  return (
+    <SlidingWindowLesson
+      onBack={() => setSelectedTopic(null)}
+    />
+  );
+}
+
   if (loading) {
     return (
       <section className="java-tracker">
@@ -157,9 +213,79 @@ function DSATracker() {
               <p>{topic.description}</p>
               {topic.title === 'Arrays' && (
   <button
+
     type="button"
     className="secondary-button"
     onClick={() => setSelectedTopic('Arrays')}
+  >
+    Start Learning →
+  </button>
+)}
+{topic.title === 'Linked Lists' && (
+  <button
+    type="button"
+    className="secondary-button"
+    onClick={() => setSelectedTopic('Linked Lists')}
+  >
+    Start Learning →
+  </button>
+)}
+
+{topic.title === 'Strings' && (
+  <button
+    type="button"
+    className="secondary-button"
+    onClick={() => setSelectedTopic('Strings')}
+  >
+    Start Learning →
+  </button>
+)}
+
+{topic.title === 'Stacks' && (
+  <button
+    type="button"
+    className="secondary-button"
+    onClick={() => setSelectedTopic('Stacks')}
+  >
+    Start Learning →
+  </button>
+)}
+
+{topic.title === 'Queues' && (
+  <button
+    type="button"
+    className="secondary-button"
+    onClick={() => setSelectedTopic('Queues')}
+  >
+    Start Learning →
+  </button>
+)}
+
+{topic.title === 'Hashing' && (
+  <button
+    type="button"
+    className="secondary-button"
+    onClick={() => setSelectedTopic('Hashing')}
+  >
+    Start Learning →
+  </button>
+)}
+
+{topic.title === 'Two Pointers' && (
+  <button
+    type="button"
+    className="secondary-button"
+    onClick={() => setSelectedTopic('Two Pointers')}
+  >
+    Start Learning →
+  </button>
+)}
+
+{topic.title === 'Sliding Window' && (
+  <button
+    type="button"
+    className="secondary-button"
+    onClick={() => setSelectedTopic('Sliding Window')}
   >
     Start Learning →
   </button>
