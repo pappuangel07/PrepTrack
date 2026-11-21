@@ -8,6 +8,7 @@ import QueuesLesson from './QueuesLesson';
 import HashingLesson from './HashingLesson';
 import TwoPointersLesson from './TwoPointersLesson';
 import SlidingWindowLesson from './SlidingWindowLesson';
+import SearchingLesson from './SearchingLesson';
 
 
 function DSATracker() {
@@ -151,6 +152,12 @@ if (selectedTopic === 'Sliding Windows') {
   );
 }
 
+
+if (selectedTopic === 'Searching') {
+  return <SearchingLesson onBack={() => setSelectedTopic(null)} />;
+}
+
+
   if (loading) {
     return (
       <section className="java-tracker">
@@ -286,6 +293,16 @@ if (selectedTopic === 'Sliding Windows') {
     type="button"
     className="secondary-button"
     onClick={() => setSelectedTopic('Sliding Window')}
+  >
+    Start Learning →
+  </button>
+)}
+
+{topic.title === 'Searching' && (
+  <button
+    type="button"
+    className="secondary-button"
+    onClick={() => setSelectedTopic('Searching')}
   >
     Start Learning →
   </button>
