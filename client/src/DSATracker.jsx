@@ -11,6 +11,7 @@ import SlidingWindowLesson from './SlidingWindowLesson';
 import SearchingLesson from './SearchingLesson';
 import SortingLesson from './SortingLesson';
 import RecursionLesson from './RecursionLesson';
+import BacktrackingLesson from './BacktrackingLesson';
 
 
 function DSATracker() {
@@ -167,6 +168,10 @@ if (selectedTopic === 'Sorting') {
 
 if (selectedTopic === 'Recursion') {
   return <RecursionLesson onBack={() => setSelectedTopic(null)} />;
+}
+
+if (selectedTopic === 'Backtracking') {
+  return <BacktrackingLesson onBack={() => setSelectedTopic(null)} />;
 }
 
 
@@ -335,6 +340,16 @@ if (selectedTopic === 'Recursion') {
     type="button"
     className="secondary-button"
     onClick={() => setSelectedTopic('Recursion')}
+  >
+    Start Learning →
+  </button>
+)}
+
+{topic.title === 'Backtracking' && (
+  <button
+    type="button"
+    className="secondary-button"
+    onClick={() => setSelectedTopic('Backtracking')}
   >
     Start Learning →
   </button>
