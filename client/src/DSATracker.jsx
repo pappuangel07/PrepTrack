@@ -9,6 +9,7 @@ import HashingLesson from './HashingLesson';
 import TwoPointersLesson from './TwoPointersLesson';
 import SlidingWindowLesson from './SlidingWindowLesson';
 import SearchingLesson from './SearchingLesson';
+import SortingLesson from './SortingLesson';
 
 
 function DSATracker() {
@@ -158,6 +159,11 @@ if (selectedTopic === 'Searching') {
 }
 
 
+if (selectedTopic === 'Sorting') {
+  return <SortingLesson onBack={() => setSelectedTopic(null)} />;
+}
+
+
   if (loading) {
     return (
       <section className="java-tracker">
@@ -303,6 +309,16 @@ if (selectedTopic === 'Searching') {
     type="button"
     className="secondary-button"
     onClick={() => setSelectedTopic('Searching')}
+  >
+    Start Learning →
+  </button>
+)}
+
+{topic.title === 'Sorting' && (
+  <button
+    type="button"
+    className="secondary-button"
+    onClick={() => setSelectedTopic('Sorting')}
   >
     Start Learning →
   </button>
