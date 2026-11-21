@@ -10,6 +10,7 @@ import TwoPointersLesson from './TwoPointersLesson';
 import SlidingWindowLesson from './SlidingWindowLesson';
 import SearchingLesson from './SearchingLesson';
 import SortingLesson from './SortingLesson';
+import RecursionLesson from './RecursionLesson';
 
 
 function DSATracker() {
@@ -161,6 +162,11 @@ if (selectedTopic === 'Searching') {
 
 if (selectedTopic === 'Sorting') {
   return <SortingLesson onBack={() => setSelectedTopic(null)} />;
+}
+
+
+if (selectedTopic === 'Recursion') {
+  return <RecursionLesson onBack={() => setSelectedTopic(null)} />;
 }
 
 
@@ -319,6 +325,16 @@ if (selectedTopic === 'Sorting') {
     type="button"
     className="secondary-button"
     onClick={() => setSelectedTopic('Sorting')}
+  >
+    Start Learning →
+  </button>
+)}
+
+{topic.title === 'Recursion' && (
+  <button
+    type="button"
+    className="secondary-button"
+    onClick={() => setSelectedTopic('Recursion')}
   >
     Start Learning →
   </button>
