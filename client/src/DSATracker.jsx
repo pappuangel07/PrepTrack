@@ -12,7 +12,7 @@ import SearchingLesson from './SearchingLesson';
 import SortingLesson from './SortingLesson';
 import RecursionLesson from './RecursionLesson';
 import BacktrackingLesson from './BacktrackingLesson';
-
+import BinaryTreesLesson from './BinaryTreesLesson';
 
 function DSATracker() {
   const [topics, setTopics] = useState([]);
@@ -173,7 +173,13 @@ if (selectedTopic === 'Recursion') {
 if (selectedTopic === 'Backtracking') {
   return <BacktrackingLesson onBack={() => setSelectedTopic(null)} />;
 }
-
+if (selectedTopic === 'Binary Trees') {
+  return (
+    <BinaryTreesLesson
+      onBack={() => setSelectedTopic(null)}
+    />
+  );
+}
 
   if (loading) {
     return (
@@ -350,6 +356,16 @@ if (selectedTopic === 'Backtracking') {
     type="button"
     className="secondary-button"
     onClick={() => setSelectedTopic('Backtracking')}
+  >
+    Start Learning →
+  </button>
+)}
+
+{topic.title === 'Binary Trees' && (
+  <button
+    type="button"
+    className="secondary-button"
+    onClick={() => setSelectedTopic('Binary Trees')}
   >
     Start Learning →
   </button>
