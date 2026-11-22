@@ -13,6 +13,10 @@ import SortingLesson from './SortingLesson';
 import RecursionLesson from './RecursionLesson';
 import BacktrackingLesson from './BacktrackingLesson';
 import BinaryTreesLesson from './BinaryTreesLesson';
+import BSTLesson from './BSTLesson';
+import HeapsLesson from './HeapsLesson';
+import GraphsLesson from './GraphsLesson';
+import GreedyAlgorithmsLesson from './GreedyAlgorithmsLesson';
 
 function DSATracker() {
   const [topics, setTopics] = useState([]);
@@ -176,6 +180,35 @@ if (selectedTopic === 'Backtracking') {
 if (selectedTopic === 'Binary Trees') {
   return (
     <BinaryTreesLesson
+      onBack={() => setSelectedTopic(null)}
+    />
+  );
+}
+if (selectedTopic === 'Binary Search Trees') {
+  return (
+    <BSTLesson
+      onBack={() => setSelectedTopic(null)}
+    />
+  );
+}
+
+if (selectedTopic === 'Heaps and Priority Queues') {
+  return (
+    <HeapsLesson
+      onBack={() => setSelectedTopic(null)}
+    />
+  );
+}
+if (selectedTopic === 'Graphs') {
+  return (
+    <GraphsLesson
+      onBack={() => setSelectedTopic(null)}
+    />
+  );
+}
+if (selectedTopic === 'Greedy Algorithms') {
+  return (
+    <GreedyAlgorithmsLesson
       onBack={() => setSelectedTopic(null)}
     />
   );
@@ -370,6 +403,46 @@ if (selectedTopic === 'Binary Trees') {
     Start Learning →
   </button>
 )}
+
+{topic.title === 'Binary Search Trees' && (
+  <button
+    type="button"
+    className="secondary-button"
+    onClick={() => setSelectedTopic('Binary Search Trees')}
+  >
+    Start Learning →
+  </button>
+)}
+
+{topic.title === 'Heaps and Priority Queues' && (
+  <button
+    type="button"
+    className="secondary-button"
+    onClick={() => setSelectedTopic('Heaps and Priority Queues')}
+  >
+    Start Learning →
+  </button>
+)}
+
+{topic.title === 'Graphs' && (
+  <button
+    type="button"
+    className="secondary-button"
+    onClick={() => setSelectedTopic('Graphs')}
+  >
+    Start Learning →
+  </button>
+)}
+{topic.title === 'Greedy Algorithms' && (
+  <button
+    type="button"
+    className="secondary-button"
+    onClick={() => setSelectedTopic('Greedy Algorithms')}
+  >
+    Start Learning →
+  </button>
+)}
+
             </div>
 
             <label className="java-status-label">
