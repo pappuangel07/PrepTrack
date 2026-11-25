@@ -1,0 +1,23 @@
+
+/* Add these styles to your existing Java/DSA stylesheet if not already present. */
+.java-lesson-page { max-width: 1000px; margin: 0 auto; padding: 24px 18px 48px; color: var(--text-primary, #172033); }
+.java-lesson-back { margin-bottom: 22px; border: 1px solid var(--border-color, #d8deea); background: var(--card-bg, #fff); color: inherit; border-radius: 10px; padding: 10px 14px; cursor: pointer; font-weight: 600; }
+.java-lesson-header { margin-bottom: 28px; }
+.java-lesson-eyebrow { color: var(--accent-color, #5b5bd6); font-size: 12px; letter-spacing: 1.5px; font-weight: 800; }
+.java-lesson-header h1 { font-size: clamp(26px, 4vw, 38px); margin: 8px 0 12px; }
+.java-lesson-header p { color: var(--text-secondary, #596579); line-height: 1.75; }
+.java-lesson-section { margin-top: 30px; }
+.java-lesson-section h2 { font-size: 24px; margin-bottom: 16px; }
+.java-lesson-section h2 small { font-size: 13px; font-weight: 500; color: var(--text-secondary, #596579); margin-left: 8px; }
+.java-lesson-card, .java-lesson-question { background: var(--card-bg, #fff); border: 1px solid var(--border-color, #e0e5ef); border-radius: 14px; padding: 18px 20px; margin-bottom: 14px; }
+.java-lesson-card h3 { margin: 0 0 12px; font-size: 18px; }
+.java-lesson-card ul { padding-left: 22px; line-height: 1.75; color: var(--text-secondary, #465267); }
+.java-lesson-code { overflow-x: auto; background: var(--code-bg, #101827); color: var(--code-text, #e8edf7); padding: 16px; border-radius: 10px; font-size: 13px; line-height: 1.65; white-space: pre; }
+.java-lesson-example { line-height: 1.7; color: var(--text-secondary, #465267); }
+.java-lesson-progress { height: 7px; background: var(--border-color, #e0e5ef); border-radius: 999px; overflow: hidden; margin-bottom: 14px; }
+.java-lesson-progress span { display: block; height: 100%; background: var(--accent-color, #5b5bd6); transition: width .2s ease; }
+.java-lesson-practice { display: flex; gap: 12px; align-items: flex-start; padding: 14px 16px; background: var(--card-bg, #fff); border: 1px solid var(--border-color, #e0e5ef); border-radius: 12px; margin-bottom: 10px; line-height: 1.65; cursor: pointer; }
+.java-lesson-practice input { margin-top: 5px; }
+.java-lesson-practice.is-done span { text-decoration: line-through; opacity: .65; }
+.java-lesson-question summary { cursor: pointer; font-weight: 600; line-height: 1.6; }
+.java-lesson-question p { line-height: 1.75; color: var(--text-secondary, #465267); }

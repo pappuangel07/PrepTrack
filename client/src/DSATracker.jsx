@@ -17,6 +17,17 @@ import BSTLesson from './BSTLesson';
 import HeapsLesson from './HeapsLesson';
 import GraphsLesson from './GraphsLesson';
 import GreedyAlgorithmsLesson from './GreedyAlgorithmsLesson';
+import DynamicProgrammingLesson from './DynamicProgrammingLesson';
+import TriesLesson from './TriesLesson';
+import DisjointSetUnionLesson from './DisjointSetUnionLesson';
+import SegmentTreeLesson from './SegmentTreeLesson';
+import FenwickTreeLesson from './FenwickTreeLesson';
+import MonotonicStackQueueLesson from './MonotonicStackQueueLesson';
+import DSACodingPracticeLesson from './DSACodingPracticeLesson';
+import DSARevisionMockLesson from './DSARevisionMockLesson';
+import DSAIntroductionLesson from './DSAIntroductionLesson';
+import TimeComplexityLesson from './TimeComplexityLesson';
+import BitManipulationLesson from './BitManipulationLesson';
 
 function DSATracker() {
   const [topics, setTopics] = useState([]);
@@ -209,6 +220,94 @@ if (selectedTopic === 'Graphs') {
 if (selectedTopic === 'Greedy Algorithms') {
   return (
     <GreedyAlgorithmsLesson
+      onBack={() => setSelectedTopic(null)}
+    />
+  );
+}
+
+if (selectedTopic === 'Dynamic Programming') {
+  return (
+    <DynamicProgrammingLesson
+      onBack={() => setSelectedTopic(null)}
+    />
+  );
+}
+
+if (selectedTopic === 'Tries') {
+  return (
+    <TriesLesson
+      onBack={() => setSelectedTopic(null)}
+    />
+  );
+}
+
+if (selectedTopic === 'Disjoint Set Union') {
+  return (
+    <DisjointSetUnionLesson
+      onBack={() => setSelectedTopic(null)}
+    />
+  );
+}
+
+if (selectedTopic === 'Segment Tree') {
+  return (
+    <SegmentTreeLesson
+      onBack={() => setSelectedTopic(null)}
+    />
+  );
+}
+
+if (selectedTopic === 'Fenwick Tree') {
+  return (
+    <FenwickTreeLesson
+      onBack={() => setSelectedTopic(null)}
+    />
+  );
+}
+
+if (selectedTopic === 'Monotonic Stack & Queue Applications') {
+  return (
+    <MonotonicStackQueueLesson
+      onBack={() => setSelectedTopic(null)}
+    />
+  );
+}
+
+if (selectedTopic === 'DSA Coding Practice') {
+  return (
+    <DSACodingPracticeLesson
+      onBack={() => setSelectedTopic(null)}
+    />
+  );
+}
+
+if (selectedTopic === 'DSA Revision & Mock Interview Practice') {
+  return (
+    <DSARevisionMockLesson
+      onBack={() => setSelectedTopic(null)}
+    />
+  );
+}
+
+if (selectedTopic === 'DSA Introduction') {
+  return (
+    <DSAIntroductionLesson
+      onBack={() => setSelectedTopic(null)}
+    />
+  );
+}
+
+if (selectedTopic === 'Time and Space Complexity') {
+  return (
+    <TimeComplexityLesson
+      onBack={() => setSelectedTopic(null)}
+    />
+  );
+}
+
+if (selectedTopic === 'Bit Manipulation') {
+  return (
+    <BitManipulationLesson
       onBack={() => setSelectedTopic(null)}
     />
   );
@@ -443,6 +542,115 @@ if (selectedTopic === 'Greedy Algorithms') {
   </button>
 )}
 
+{topic.title === 'Dynamic Programming' && (
+  <button
+    type="button"
+    className="secondary-button"
+    onClick={() => setSelectedTopic('Dynamic Programming')}
+  >
+    Start Learning →
+  </button>
+)}
+
+{topic.title === 'Trie' && (
+  <button
+    type="button"
+    className="secondary-button"
+    onClick={() => setSelectedTopic('Trie')}
+  >
+    Start Learning →
+  </button>
+)}
+
+{topic.title === 'Disjoint Set Union' && (
+  <button
+    type="button"
+    className="secondary-button"
+    onClick={() => setSelectedTopic('Disjoint Set Union')}
+  >
+    Start Learning →
+  </button>
+)}
+
+{topic.title === 'Segment Tree' && (
+  <button
+    type="button"
+    className="secondary-button"
+    onClick={() => setSelectedTopic('Segment Tree')}
+  >
+    Start Learning →
+  </button>
+)}
+
+{topic.title === 'Fenwick Tree' && (
+  <button
+    type="button"
+    className="secondary-button"
+    onClick={() => setSelectedTopic('Fenwick Tree')}
+  >
+    Start Learning →
+  </button>
+)}
+
+{topic.title === 'Monotonic Stack and Queue' && (
+  <button
+    type="button"
+    className="secondary-button"
+    onClick={() => setSelectedTopic('Monotonic Stack')}
+  >
+    Start Learning →
+  </button>
+)}
+
+{topic.title === 'DSA Coding Practice' && (
+  <button
+    type="button"
+    className="secondary-button"
+    onClick={() => setSelectedTopic('DSA Coding Practice')}
+  >
+    Start Learning →
+  </button>
+)}
+
+{topic.title === 'DSA Revision & Mock Interview Practice' && (
+  <button
+    type="button"
+    className="secondary-button"
+    onClick={() => setSelectedTopic('DSA Revision & Mock Interview Practice')}
+  >
+    Start Learning →
+  </button>
+)}
+
+{topic.title === 'DSA Introduction' && (
+  <button
+    type="button"
+    className="secondary-button"
+    onClick={() => setSelectedTopic('DSA Introduction')}
+  >
+    Start Learning →
+  </button>
+)}
+
+{topic.title === 'Time and Space Complexity' && (
+  <button
+    type="button"
+    className="secondary-button"
+    onClick={() => setSelectedTopic('Time and Space Complexity')}
+  >
+    Start Learning →
+  </button>
+)}
+
+{topic.title === 'Bit Manipulation' && (
+  <button
+    type="button"
+    className="secondary-button"
+    onClick={() => setSelectedTopic('Bit Manipulation')}
+  >
+    Start Learning →
+  </button>
+)}
             </div>
 
             <label className="java-status-label">
