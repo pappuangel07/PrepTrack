@@ -1,6 +1,7 @@
 
 import { useEffect, useMemo, useState } from 'react';
 import { apiFetch } from './api';
+import AptitudeLesson from './AptitudeLesson';
 
 function AptitudeTracker() {
   const [topics, setTopics] = useState([]);
@@ -9,7 +10,7 @@ function AptitudeTracker() {
   const [updatingId, setUpdatingId] = useState(null);
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState('All');
-
+  const [selectedTopic, setSelectedTopic] = useState(null);
   useEffect(() => {
     async function loadTopics() {
       try {
@@ -94,6 +95,15 @@ function AptitudeTracker() {
     );
   }
 
+  if (selectedTopic !== null) {
+  return (
+    <AptitudeLesson
+      topic={selectedTopic}
+      onBack={() => setSelectedTopic(null)}
+    />
+  );
+}
+
   return (
     <section className="java-tracker" id="aptitude-tracker">
       <div className="java-tracker-header">
@@ -146,6 +156,16 @@ function AptitudeTracker() {
               <span className="java-topic-category">{topic.category}</span>
               <h3>{topic.title}</h3>
               <p>{topic.description}</p>
+
+              <p>{topic.description}</p>
+
+<button
+  type="button"
+  className="secondary-button"
+  onClick={() => setSelectedTopic(topic.title)}
+>
+  Start Learning →
+</button>
             </div>
 
             <label className="java-status-label">

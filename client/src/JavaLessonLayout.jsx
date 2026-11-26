@@ -42,12 +42,47 @@ export default function JavaLessonLayout({ title, level = "Beginner to Interview
         <div className="java-lesson-progress">
           <span style={{ width: total ? `${(completed / total) * 100}%` : "0%" }} />
         </div>
-        {practice.map((item, index) => (
-          <label className={`java-lesson-practice ${done[index] ? "is-done" : ""}`} key={index}>
-            <input type="checkbox" checked={Boolean(done[index])} onChange={() => toggle(index)} />
-            <span><b>Problem {index + 1}.</b> {item}</span>
-          </label>
-        ))}
+{practice.map((item, index) => {
+  const question = typeof item === "string" ? item : item.question;
+
+  return (
+    <div
+      className={`java-lesson-practice ${done[index] ? "is-done" : ""}`}
+      key={index}
+    >
+      <label>
+        <input
+          type="checkbox"
+          checked={Boolean(done[index])}
+          onChange={() => toggle(index)}
+        />
+        <span>
+          <b>Problem {index + 1}.</b> {question}
+        </span>
+      </label>
+
+      {typeof item === "object" && item.answer && (
+        <details className="java-practice-answer">
+          <summary>View answer</summary>
+
+          <p>{item.answer}</p>
+
+          {item.explanation && (
+            <p>
+              <b>Explanation:</b> {item.explanation}
+            </p>
+          )}
+
+          {item.code && (
+            <pre>
+              <code>{item.code}</code>
+            </pre>
+          )}
+        </details>
+      )}
+    </div>
+  );
+})}
       </section>
 
       <section className="java-lesson-section">
