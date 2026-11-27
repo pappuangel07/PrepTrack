@@ -1,8 +1,12 @@
 
 import { useState } from "react";
+import HcfLcmLesson from "./HcfLcmLesson";
 
 export default function AptitudeLesson({ topic, onBack }) {
   const [completed, setCompleted] = useState(false);
+if (topic === "HCF and LCM") {
+  return <HcfLcmLesson onBack={onBack} />;
+}
 
   if (topic !== "Number System") {
     return (
